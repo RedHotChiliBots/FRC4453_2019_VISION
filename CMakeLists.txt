@@ -1,23 +1,12 @@
 cmake_minimum_required (VERSION 2.6)
 project (PixyVision)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/CMake/")
-cmake_policy(SET CMP0069 NEW)
 
 find_package(LibUSB)
-if(${CMAKE_BUILD_TYPE} STREQUAL "Release")
-    set(CMAKE_CXX_FLAGS "-ffast-math ${CMAKE_CXX_FLAGS}")
-endif(${CMAKE_BUILD_TYPE} STREQUAL "Release")
+
 add_library(pixy2usb libs/pixy2/src/common/src/chirp.cpp libs/pixy2/src/host/libpixyusb2/src/libpixyusb2.cpp libs/pixy2/src/host/libpixyusb2/src/usblink.cpp libs/pixy2/src/host/libpixyusb2/src/util.cpp)
 target_include_directories(pixy2usb PUBLIC libs/pixy2/src/common/inc libs/pixy2/src/host/libpixyusb2/include libs/pixy2/src/host/arduino/libraries/Pixy2 ${LibUSB_INCLUDE_DIRS})
-if(${CMAKE_BUILD_TYPE} STREQUAL "Release")
-    set_property(TARGET pixy2usb PROPERTY INTERPROCEDURAL_OPTIMIZATION True)
-endif(${CMAKE_BUILD_TYPE} STREQUAL "Release")
 
-set_property(TARGET pixy2usb PROPERTY INTERPROCEDURAL_OPTIMIZATION True)
-
-add_executable(PixyVision main.cpp)
-target_include_directories(PixyVision PUBLIC libs/pixy2/src/host/libpixyusb2/include libs/gcem/include)
-target_link_libraries(PixyVision pixy2usb ${LibUSB_LIBRARIES})
-if(${CMAKE_BUILD_TYPE} STREQUAL "Release")
-    set_property(TARGET PixyVision PROPERTY INTERPROCEDURAL_OPTIMIZATION True)
-endif(${CMAKE_BUILD_TYPE} STREQUAL "Release")
+add_executable(Vision main.cpp)
+target_include_directories(Vision PUBLIC libs/pixy2/src/host/libpixyusb2/include libs/gcem/include)
+target_link_libraries(Vision pixy2usb ${LibUSB_LIBRARIES})
