@@ -1,0 +1,6 @@
+[submodule "libs/pixy2"]
+	path = libs/pixy2
+	url = https://github.com/charmedlabs/pixy2
+[submodule "libs/gcem"]
+	path = libs/gcem
+	url = https://github.com/kthohr/gcem.git
