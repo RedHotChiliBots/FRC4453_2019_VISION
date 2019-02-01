@@ -6,10 +6,10 @@ before_install: eval "CC=gcc-7 && CXX=g++-7" && chmod +x ./libs/install_opencv.s
 addons:
   apt:
     sources:
-      - ubuntu-toolchain-r-test
+      - sourceline: 'ppa:ubuntu-toolchain-r/test'
     packages:
       - libusb-1.0-0-dev
-      - gcc-7
+      - g++-7
 cache:
   directories:
   - build
