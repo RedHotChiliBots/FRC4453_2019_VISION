@@ -2,7 +2,6 @@ dist: xenial
 language: cpp
 script: eval "CC=gcc-7 && CXX=g++-7" && mkdir -p build && cd build && cmake .. && make Vision
 compiler: gcc
-before_install: eval "CC=gcc-7 && CXX=g++-7" && chmod +x ./libs/install_opencv.sh && ./libs/install_opencv.sh
 addons:
   apt:
     sources:
@@ -13,4 +12,3 @@ addons:
 cache:
   directories:
   - build
-  - OpenCV
