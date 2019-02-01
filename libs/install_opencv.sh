@@ -60,9 +60,7 @@ sudo apt-get install -y unzip wget
 wget https://github.com/opencv/opencv/archive/${OPENCV_VERSION}.zip
 unzip ${OPENCV_VERSION}.zip
 rm ${OPENCV_VERSION}.zip
-if [ ! -e ./OpenCV ]; then
-    mv -v opencv-${OPENCV_VERSION} OpenCV
-fi
+mv -vf opencv-${OPENCV_VERSION} OpenCV
 cd OpenCV
 mkdir -p build
 cd build
