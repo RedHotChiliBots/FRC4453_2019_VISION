@@ -1,9 +1,12 @@
 dist: xenial
 language: cpp
-script: mkdir -p build && cd build && cmake .. && make
+script: eval "CC=gcc-7 && CXX=g++-7" && mkdir -p build && cd build && cmake .. && make
 compiler: gcc
-before_install: chmod +x ./libs/install_opencv.sh && ./libs/install_opencv.sh
+before_install: eval "CC=gcc-7 && CXX=g++-7" && chmod +x ./libs/install_opencv.sh && ./libs/install_opencv.sh
 addons:
   apt:
+    sources:
+      - ubuntu-toolchain-r-test
     packages:
       - libusb-1.0-0-dev
+      - g++-7
