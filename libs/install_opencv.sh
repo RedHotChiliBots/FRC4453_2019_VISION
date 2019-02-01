@@ -64,7 +64,7 @@ if [! -e OpenCV]; then
     mv opencv-${OPENCV_VERSION} OpenCV
 fi
 cd OpenCV
-mkdir build
+mkdir -p build
 cd build
 cmake -DWITH_QT=ON -DWITH_OPENGL=ON -DFORCE_VTK=ON -DWITH_TBB=ON -DWITH_GDAL=ON -DWITH_XINE=ON -DBUILD_EXAMPLES=ON -DENABLE_PRECOMPILED_HEADERS=OFF ..
 make -j4
