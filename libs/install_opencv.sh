@@ -57,14 +57,15 @@ sudo apt-get install -y doxygen
 # 3. INSTALL THE LIBRARY
 
 sudo apt-get install -y unzip wget
+mkdir -p OpenCV
+cd OpenCV
 wget https://github.com/opencv/opencv/archive/${OPENCV_VERSION}.zip
 unzip ${OPENCV_VERSION}.zip
 rm ${OPENCV_VERSION}.zip
-mv -vf opencv-${OPENCV_VERSION} OpenCV
-cd OpenCV
+mv -vf opencv-${OPENCV_VERSION} opencv
 mkdir -p build
 cd build
-cmake -DCMAKE_PREFIX=/usr -DWITH_QT=ON -DWITH_OPENGL=ON -DFORCE_VTK=ON -DWITH_TBB=ON -DWITH_GDAL=ON -DWITH_XINE=ON -DBUILD_EXAMPLES=ON -DENABLE_PRECOMPILED_HEADERS=OFF ..
+cmake -DCMAKE_PREFIX=/usr -DWITH_QT=ON -DWITH_OPENGL=ON -DFORCE_VTK=ON -DWITH_TBB=ON -DWITH_GDAL=ON -DWITH_XINE=ON -DBUILD_EXAMPLES=ON -DENABLE_PRECOMPILED_HEADERS=OFF ../opencv
 make -j4
 sudo make install
 sudo ldconfig
