@@ -1,7 +1,8 @@
+dist: xenial
 language: cpp
 script: mkdir -p build && cd build && cmake .. && make
 compiler: gcc
-
+before_install: chmod +x ./libs/install_opencv.sh && ./libs/install_opencv.sh
 addons:
   apt:
     packages:
