@@ -64,6 +64,7 @@ unzip -o ${OPENCV_VERSION}.zip
 rm ${OPENCV_VERSION}.zip
 mkdir -p build
 cd build
+find -type f -exec touch {} +
 cmake -DCMAKE_PREFIX=/usr -DWITH_QT=ON -DWITH_OPENGL=ON -DFORCE_VTK=ON -DWITH_TBB=ON -DWITH_GDAL=ON -DWITH_XINE=ON -DBUILD_EXAMPLES=ON -DENABLE_PRECOMPILED_HEADERS=OFF ../opencv-${OPENCV_VERSION}
 make -j4
 sudo make install
