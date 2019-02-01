@@ -9,4 +9,8 @@ addons:
       - ubuntu-toolchain-r-test
     packages:
       - libusb-1.0-0-dev
-      - g++-7
+      - gcc-7
+cache:
+  directories:
+  - build
+  - OpenCV
