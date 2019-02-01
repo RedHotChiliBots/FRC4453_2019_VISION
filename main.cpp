@@ -1,9 +1,15 @@
 #include <iostream>
 #include <cmath>
 #include <algorithm>
+#include <future>
 
 #include <libpixyusb2.h>
 #include <gcem.hpp>
+#include <networktables/NetworkTableInstance.h>
+
+
+#include "geom.hpp"
+#include "cammath.hpp"
 
 constexpr double rad2deg(double v) {
     return v * (180.0 / M_PI);
@@ -13,51 +19,97 @@ constexpr double deg2rad(double v) {
     return v / (180.0 / M_PI);
 }
 
-constexpr static double CAM_HEIGHT = 4; // 4 inches. TODO: Find the real value of camera height.
-constexpr static double CAM_DOWNTILT = deg2rad(25.0); // Angle below horizontal.
-constexpr static double CAM_ANGLE = deg2rad(90.0) - CAM_DOWNTILT;
-constexpr static double CAM_FOV = deg2rad(60.0);
-constexpr static double CAM_ASPECT_RATIO = 4.0/3.0;
-constexpr static double CAM_VFOV = CAM_FOV / CAM_ASPECT_RATIO;
-constexpr static uint8_t CAM_VECW = 79;
-constexpr static uint8_t CAM_VECH = 52;
+constexpr double CAM_HEIGHT = 4.0;
+constexpr double CAM_DOWNPITCH = deg2rad(-40.0);
 
-constexpr static double CAM_FOCAL_LENGTH_VEC = (0.5 * CAM_VECW) / gcem::tan(0.5 * CAM_FOV);
+const camera3<double> CAMERA(vector2<double>(79.0, 52.0), deg2rad(60.0), vector3<double>(0.0, 0.0, 0.0), vector3<double>(CAM_DOWNPITCH, 0.0, 0.0)); // 79x52 for line tracking according to https://docs.pixycam.com/wiki/doku.php?id=wiki:v2:line_api#fn__3, fov of 60 degress according to https://docs.pixycam.com/wiki/doku.php?id=wiki:v2:overview
 
-template<typename T>
-struct vector2 {
-    vector2(T& x_i, T& y_i) : x(x_i), y(y_i) {}
-    vector2(T&& x_i, T&& y_i) : x(std::move(x_i)), y(std::move(y_i)) {}
+constexpr plane3<double> FLOOR(vector3<double>(0.0, 0.0, -CAM_HEIGHT), vector3<double>(0.0, 0.0, 1.0).normalize()); 
 
-    T x, y;
 
-    vector2<T>& operator+=(const vector2<T>& other) {
-        x += other.x;
-        y += other.y;
-        return *this;
-    };
 
-    // TODO: More operators for vector2.
-};
+std::pair<vector2<double>, vector2<double>> transform_vector(const Vector& v) {
+    vector2<double> a((double)v.m_x0, (double)v.m_y0), b((double)v.m_x1, (double)v.m_y1);
 
-void vector_to_world(vector2<uint8_t> v, vector2<double> v_out) {
-    // TODO: Write vector_to_world.
-    // Math looks like y = CAM_HEIGHT * tan(y_angle)
-    // x = y * tan(x_angle) 
+    auto a_r = CAMERA.cast_ray(a);
+    auto b_r = CAMERA.cast_ray(b);
+
+    return std::make_pair(FLOOR.ray_intersect(a_r).value().truncate(), FLOOR.ray_intersect(b_r).value().truncate());
 }
 
-int main() {
-    Pixy2 pixy;
-    std::cout << "Connecting to PixyCam..." << std::endl;
+class ConnectionWaiter {
+public:
+    struct Listener {
+        std::shared_ptr<std::promise<void>> p;
+        Listener() : p(new std::promise<void>()) {} 
+        Listener(const Listener& l) : p(l.p) {}
+        Listener(Listener&& l) : p(std::move(l.p)) {}
 
-    int result;
+        void operator()(const nt::ConnectionNotification& event) {
+            std::cout << "NT Listener: connected: " << event.connected;
+            if(event.connected) {
+                p->set_value();
+                std::cout << ", id: " << event.conn.remote_id << ", ip: " << event.conn.remote_ip << ":" << event.conn.remote_port;
+            }
+            std::cout << std::endl;
+        }
+    };
 
-    if((result = pixy.init()) < 0) {
-        std::cout << "Failed to open PixyCam: " << result << std::endl;
-        return -1;
+    Listener listener;
+    std::future<void> connected;
+
+    ConnectionWaiter() : listener(), connected(listener.p->get_future()) {
+
     }
 
-    pixy.setLamp(100, 100);
+    template<typename T>
+    void wait_for_connection(T timeout) {
+        if(!connected.valid()) {
+            throw std::logic_error("Future is not valid!");
+        }
+        if(connected.wait_for(timeout) == std::future_status::timeout) {
+            throw std::runtime_error("Timeout while connecting to NetworkTables.");
+        }
+        return connected.get();
+    }
+};
+
+int main() {
+    auto networktables_f = std::async([]() {
+        std::cout << "NT Setup: Connecting to NetworkTables..." << std::endl;
+        ConnectionWaiter waiter;
+        auto nt_inst = nt::NetworkTableInstance::GetDefault();
+        nt_inst.SetNetworkIdentity("Vision");
+        nt_inst.AddConnectionListener(waiter.listener, true);
+        nt_inst.StartClientTeam(4453);
+        waiter.wait_for_connection(std::chrono::seconds(10));
+        std::cout << "NT Setup: Connected to NetworkTables." << std::endl;
+        return nt_inst;
+    });
+
+    auto pixy_f = std::async([]() {
+        Pixy2 p;
+        std::cout << "Pixy Setup: Connecting to PixyCam..." << std::endl;
+        if(p.init() < 0) {
+            throw std::runtime_error("Failed to open PixyCam.");
+        }
+        p.getVersion();
+        p.version->print();
+        std::cout << "Pixy Setup: USB Bus: " << (int)p.m_link.getUSBBus() << std::endl;
+        std::cout << "Pixy Setup: USB Path: " << std::endl;
+        uint8_t ports[7];
+        size_t num_ports = p.m_link.getUSBPorts(ports, 7);
+        for(size_t i = 0; i < num_ports; i++) {
+            std::cout << i << "Pixy Setup: >> port " << (int)ports[i] << std::endl;
+        }
+        p.setLamp(100, 100);
+        return p;
+    });
+
+    auto networktables = networktables_f.get();
+    auto pixy = pixy_f.get();
+
+    auto table = networktables.GetTable("Vision");
 
     while(true) {
         pixy.line.getMainFeatures(LINE_VECTOR, true);
@@ -68,16 +120,29 @@ int main() {
 
         auto the_vector = pixy.line.vectors[0];
 
-        the_vector.m_y0 = -the_vector.m_y0;
-        the_vector.m_y1 = -the_vector.m_y1;
+        vector2<double> a, b;
 
-        if(the_vector.m_y0 > the_vector.m_y1) {
-            std::swap(the_vector.m_y0, the_vector.m_y1);
-            std::swap(the_vector.m_x0, the_vector.m_x1);
+        try {
+            auto transformed = transform_vector(the_vector);
+            a = transformed.first;
+            b = transformed.second;
+        } catch (std::bad_optional_access& e) {
+            std::cout << "Vision: Error processing vectors. Skipping frame..." << std::endl;
+            continue;
         }
 
+        table->PutNumber("NumVectors", pixy.line.numVectors);
+        table->PutNumber("VectorX1", a.x);
+        table->PutNumber("VectorY1", a.y);
+        table->PutNumber("VectorX2", b.x);
+        table->PutNumber("VectorY2", b.y);
 
-        //TODO: Finish Main Loop.
+        double turn = std::atan2(b.y - a.y, b.x - a.x);
+        vector2<double> center = (a + b) / 2.0;
+        double strafe = center.x;
 
+        table->PutNumber("Turn", turn);
+        table->PutNumber("Strafe", strafe);
+        networktables.Flush();
     }
 }

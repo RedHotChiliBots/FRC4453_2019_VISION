@@ -4,3 +4,6 @@
 [submodule "libs/gcem"]
 	path = libs/gcem
 	url = https://github.com/kthohr/gcem.git
+[submodule "libs/allwpilib"]
+	path = libs/allwpilib
+	url = https://github.com/wpilibsuite/allwpilib.git
