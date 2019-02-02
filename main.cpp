@@ -41,6 +41,7 @@ class ConnectionWaiter {
 public:
     struct Listener {
         std::shared_ptr<std::promise<void>> p;
+        bool is_notified = false;
         Listener() : p(new std::promise<void>()) {} 
         Listener(const Listener& l) : p(l.p) {}
         Listener(Listener&& l) : p(std::move(l.p)) {}
@@ -48,7 +49,11 @@ public:
         void operator()(const nt::ConnectionNotification& event) {
             std::cout << "NT Listener: connected: " << event.connected;
             if(event.connected) {
-                p->set_value();
+                if(!is_notified)
+                {
+                    p->set_value();
+                    is_notified = true;
+                }
                 std::cout << ", id: " << event.conn.remote_id << ", ip: " << event.conn.remote_ip << ":" << event.conn.remote_port;
             }
             std::cout << std::endl;
@@ -88,21 +93,21 @@ int main() {
     });
 
     auto pixy_f = std::async([]() {
-        Pixy2 p;
+       std::shared_ptr<Pixy2> p(new Pixy2());
         std::cout << "Pixy Setup: Connecting to PixyCam..." << std::endl;
-        if(p.init() < 0) {
+        if(p->init() < 0) {
             throw std::runtime_error("Failed to open PixyCam.");
         }
-        p.getVersion();
-        p.version->print();
-        std::cout << "Pixy Setup: USB Bus: " << (int)p.m_link.getUSBBus() << std::endl;
+        p->getVersion();
+        p->version->print();
+        std::cout << "Pixy Setup: USB Bus: " << (int)p->m_link.getUSBBus() << std::endl;
         std::cout << "Pixy Setup: USB Path: " << std::endl;
         uint8_t ports[7];
-        size_t num_ports = p.m_link.getUSBPorts(ports, 7);
+        size_t num_ports = p->m_link.getUSBPorts(ports, 7);
         for(size_t i = 0; i < num_ports; i++) {
             std::cout << i << "Pixy Setup: >> port " << (int)ports[i] << std::endl;
         }
-        p.setLamp(100, 100);
+        p->setLamp(100, 100);
         return p;
     });
 
@@ -112,37 +117,37 @@ int main() {
     auto table = networktables.GetTable("Vision");
 
     while(true) {
-        pixy.line.getMainFeatures(LINE_VECTOR, true);
+        pixy->line.getMainFeatures(LINE_VECTOR, true);
         
-        if(pixy.line.numVectors == 0) {
-            continue;
+        if(pixy->line.numVectors > 0) {
+            auto the_vector = pixy->line.vectors[0];
+
+            vector2<double> a, b;
+
+            try {
+                auto transformed = transform_vector(the_vector);
+                a = transformed.first;
+                b = transformed.second;
+            } catch (std::bad_optional_access& e) {
+                std::cout << "Vision: Error processing vectors. Skipping frame..." << std::endl;
+                continue;
+            }
+
+            table->PutNumber("VectorX1", a.x);
+            table->PutNumber("VectorY1", a.y);
+            table->PutNumber("VectorX2", b.x);
+            table->PutNumber("VectorY2", b.y);
+
+            double turn = rad2deg(std::atan2(b.y - a.y, b.x - a.x)) + 90;
+            vector2<double> center = (a + b) / 2.0;
+            double strafe = center.x;
+
+            table->PutNumber("Turn", turn);
+            table->PutNumber("Strafe", strafe);
+            networktables.Flush();
         }
 
-        auto the_vector = pixy.line.vectors[0];
-
-        vector2<double> a, b;
-
-        try {
-            auto transformed = transform_vector(the_vector);
-            a = transformed.first;
-            b = transformed.second;
-        } catch (std::bad_optional_access& e) {
-            std::cout << "Vision: Error processing vectors. Skipping frame..." << std::endl;
-            continue;
-        }
-
-        table->PutNumber("NumVectors", pixy.line.numVectors);
-        table->PutNumber("VectorX1", a.x);
-        table->PutNumber("VectorY1", a.y);
-        table->PutNumber("VectorX2", b.x);
-        table->PutNumber("VectorY2", b.y);
-
-        double turn = std::atan2(b.y - a.y, b.x - a.x);
-        vector2<double> center = (a + b) / 2.0;
-        double strafe = center.x;
-
-        table->PutNumber("Turn", turn);
-        table->PutNumber("Strafe", strafe);
-        networktables.Flush();
+        table->PutNumber("NumVectors", pixy->line.numVectors);
+        
     }
 }
