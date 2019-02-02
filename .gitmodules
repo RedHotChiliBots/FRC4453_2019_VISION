@@ -7,3 +7,6 @@
 [submodule "libs/allwpilib"]
 	path = libs/allwpilib
 	url = https://github.com/RedHotChiliBots/allwpilib.git
+[submodule "libs/libusb"]
+	path = libs/libusb
+	url = https://github.com/libusb/libusb.git

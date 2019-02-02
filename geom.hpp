@@ -3,6 +3,7 @@
 #include <gcem.hpp>
 #include <optional>
 #include <cstring>
+#include <cmath>
 
 template<typename T>
 struct vector2 {
@@ -77,6 +78,8 @@ struct vector2 {
 template<typename T>
 struct vector3 {
     T x, y, z;
+
+    constexpr vector3() : x(0), y(0), z(0) {}
 
     template<typename U>
     constexpr vector3(vector3<U>& other) : x(other.x), y(other.y), z(other.z) {}
