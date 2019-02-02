@@ -7,7 +7,6 @@
 #include <gcem.hpp>
 #include <networktables/NetworkTableInstance.h>
 
-
 #include "geom.hpp"
 #include "cammath.hpp"
 
@@ -23,10 +22,7 @@ constexpr double CAM_HEIGHT = 4.0;
 constexpr double CAM_DOWNPITCH = deg2rad(-40.0);
 
 const camera3<double> CAMERA(vector2<double>(79.0, 52.0), deg2rad(60.0), vector3<double>(0.0, 0.0, 0.0), vector3<double>(CAM_DOWNPITCH, 0.0, 0.0)); // 79x52 for line tracking according to https://docs.pixycam.com/wiki/doku.php?id=wiki:v2:line_api#fn__3, fov of 60 degress according to https://docs.pixycam.com/wiki/doku.php?id=wiki:v2:overview
-
 constexpr plane3<double> FLOOR(vector3<double>(0.0, 0.0, -CAM_HEIGHT), vector3<double>(0.0, 0.0, 1.0).normalize()); 
-
-
 
 std::pair<vector2<double>, vector2<double>> transform_vector(const Vector& v) {
     vector2<double> a((double)v.m_x0, (double)v.m_y0), b((double)v.m_x1, (double)v.m_y1);
@@ -63,9 +59,7 @@ public:
     Listener listener;
     std::future<void> connected;
 
-    ConnectionWaiter() : listener(), connected(listener.p->get_future()) {
-
-    }
+    ConnectionWaiter() : listener(), connected(listener.p->get_future()) {}
 
     template<typename T>
     void wait_for_connection(T timeout) {
@@ -148,6 +142,5 @@ int main() {
         }
 
         table->PutNumber("NumVectors", pixy->line.numVectors);
-        
     }
 }

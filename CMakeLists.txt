@@ -17,7 +17,6 @@ message(STATUS "Target triple: ${GCC_TARGET_TRIPLE}")
 
 # Add libusb project.
 include(ExternalProject)
-
 ExternalProject_Add(
   libusb
   GIT_REPOSITORY https://github.com/libusb/libusb.git
