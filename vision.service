@@ -1,0 +1,10 @@
+[Unit]
+Description="Vision service"
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/Vision
+
+[Install]
+WantedBy=multi-user.target

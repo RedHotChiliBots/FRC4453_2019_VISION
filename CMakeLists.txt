@@ -1,5 +1,13 @@
 cmake_minimum_required (VERSION 2.6)
-project (PixyVision)
+project (Vision)
+
+# Project options
+set(SYSTEMD_UNIT_DIR "lib/systemd/system/" CACHE PATH "Where to install systemd unit to.")
+
+# Set default for prefix.
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+  set(CMAKE_INSTALL_PREFIX "/usr" CACHE PATH "..." FORCE)
+endif()
 
 # Options for wpilib.
 set(WITHOUT_JAVA ON CACHE BOOL "don't include java and JNI in the build" FORCE)
@@ -48,6 +56,31 @@ target_link_libraries(pixy2usb ${install_dir}/lib/libusb-1.0.a)
 add_executable(Vision main.cpp geom.hpp cammath.hpp)
 target_include_directories(Vision PUBLIC libs/pixy2/src/host/libpixyusb2/include libs/gcem/include libs/allwpilib/ntcore/src/main/native/include)
 add_dependencies(Vision libusb)
-target_link_libraries(Vision pixy2usb ${LibUSB_LIBRARIES} ntcore)
+target_link_libraries(Vision pixy2usb ntcore -static -static-libgcc -static-libstdc++)
 set_property(TARGET Vision PROPERTY CXX_STANDARD 17)
 set_property(TARGET Vision PROPERTY CXX_STANDARD_REQUIRED YES)
+
+install(TARGETS Vision
+  RUNTIME 
+  DESTINATION bin
+  COMPONENT Vision)
+
+install(FILES ${CMAKE_SOURCE_DIR}/vision.service 
+  DESTINATION ${SYSTEMD_UNIT_DIR}
+  COMPONENT Vision)
+
+set(CPACK_GENERATOR "DEB")
+set(CPACK_PACKAGE_CONTACT "Conner Ebbinghaus")
+set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE armhf)
+set(CPACK_DEB_COMPONENT_INSTALL ON)
+set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
+set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF)
+set(CPACK_COMPONENT_INCLUDE_TOPLEVEL_DIRECTORY OFF)
+set(CPACK_SET_DESTDIR ON)
+
+set(CPACK_COMPONENTS_ALL Vision)
+
+set(CPACK_COMPONENT_VISION_DISPLAY_NAME "Vision")
+set (CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+
+include(CPack)
