@@ -1,5 +1,10 @@
 cmake_minimum_required (VERSION 2.6)
 project (Vision)
+cmake_policy(SET CMP0069 NEW)
+
+include(CheckIPOSupported)
+
+check_ipo_supported(RESULT ipo_avail)
 
 # Project options
 set(SYSTEMD_UNIT_DIR "lib/systemd/system/" CACHE PATH "Where to install systemd unit to.")
@@ -24,12 +29,20 @@ string(STRIP ${GCC_TARGET_TRIPLE} GCC_TARGET_TRIPLE)
 message(STATUS "Target triple: ${GCC_TARGET_TRIPLE}")
 
 # Add libusb project.
+if(ipo_avail)
+  set(LIBUSB_CFLAGS "${CMAKE_C_FLAGS} -flto")
+  set(LIBUSB_CXXFLAGS "${CMAKE_CXX_FLAGS} -flto")
+else()
+  set(LIBUSB_CFLAGS "${CMAKE_C_FLAGS}")
+  set(LIBUSB_CXXFLAGS "${CMAKE_CXX_FLAGS}")
+endif()
+
 include(ExternalProject)
 ExternalProject_Add(
   libusb
   GIT_REPOSITORY https://github.com/libusb/libusb.git
-  CONFIGURE_COMMAND CFLAGS=${CMAKE_C_FLAGS} CXXFLAGS=${CMAKE_CXX_FLAGS} <SOURCE_DIR>/configure --prefix=<INSTALL_DIR> --disable-shared --disable-udev --host=${GCC_TARGET_TRIPLE}
-  BUILD_COMMAND CFLAGS=${CMAKE_C_FLAGS} CXXFLAGS=${CMAKE_CXX_FLAGS} make
+  CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR> --disable-shared --disable-udev --host=${GCC_TARGET_TRIPLE} "CFLAGS=${LIBUSB_CFLAGS}" "CXXFLAGS=${LIBUSB_CXXFLAGS}"
+  BUILD_COMMAND make "CFLAGS=${LIBUSB_CFLAGS}" "CXXFLAGS=${LIBUSB_CXXFLAGS}"
   BUILD_BYPRODUCTS <INSTALL_DIR>/lib/libusb-1.0.a
 )
 
@@ -56,9 +69,15 @@ target_link_libraries(pixy2usb ${install_dir}/lib/libusb-1.0.a)
 add_executable(Vision main.cpp geom.hpp cammath.hpp)
 target_include_directories(Vision PUBLIC libs/pixy2/src/host/libpixyusb2/include libs/gcem/include libs/allwpilib/ntcore/src/main/native/include)
 add_dependencies(Vision libusb)
-target_link_libraries(Vision pixy2usb ntcore -static -static-libgcc -static-libstdc++)
+target_link_libraries(Vision pixy2usb ntcore)
 set_property(TARGET Vision PROPERTY CXX_STANDARD 17)
 set_property(TARGET Vision PROPERTY CXX_STANDARD_REQUIRED YES)
+
+if(ipo_avail)
+  message(STATUS "IPO Enabled.")
+  set_target_properties(Vision pixy2usb ntcore PROPERTIES INTERPROCEDURAL_OPTIMIZATION TRUE)
+endif()
+
 
 install(TARGETS Vision
   RUNTIME 
@@ -77,7 +96,7 @@ set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
 set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF)
 set(CPACK_COMPONENT_INCLUDE_TOPLEVEL_DIRECTORY OFF)
 set(CPACK_SET_DESTDIR ON)
-
+SET(CPACK_STRIP_FILES ON)
 set(CPACK_COMPONENTS_ALL Vision)
 
 set(CPACK_COMPONENT_VISION_DISPLAY_NAME "Vision")
