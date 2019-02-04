@@ -63,13 +63,12 @@ ExternalProject_Get_Property(libusb install_dir)
 add_library(pixy2usb libs/pixy2/src/common/src/chirp.cpp libs/pixy2/src/host/libpixyusb2/src/libpixyusb2.cpp libs/pixy2/src/host/libpixyusb2/src/usblink.cpp libs/pixy2/src/host/libpixyusb2/src/util.cpp)
 add_dependencies(pixy2usb libusb)
 target_include_directories(pixy2usb PUBLIC libs/pixy2/src/common/inc libs/pixy2/src/host/libpixyusb2/include libs/pixy2/src/host/arduino/libraries/Pixy2 ${install_dir}/include/libusb-1.0)
-target_link_libraries(pixy2usb ${install_dir}/lib/libusb-1.0.a)
 
 # Main binary
 add_executable(Vision main.cpp geom.hpp cammath.hpp)
 target_include_directories(Vision PUBLIC libs/pixy2/src/host/libpixyusb2/include libs/gcem/include libs/allwpilib/ntcore/src/main/native/include)
 add_dependencies(Vision libusb)
-target_link_libraries(Vision pixy2usb ntcore)
+target_link_libraries(Vision pixy2usb ntcore ${install_dir}/lib/libusb-1.0.a)
 set_property(TARGET Vision PROPERTY CXX_STANDARD 17)
 set_property(TARGET Vision PROPERTY CXX_STANDARD_REQUIRED YES)
 
