@@ -4,7 +4,7 @@ cmake_policy(SET CMP0069 NEW)
 
 include(CheckIPOSupported)
 
-check_ipo_supported(RESULT ipo_avail)
+# check_ipo_supported(RESULT ipo_avail)
 
 # Project options
 set(SYSTEMD_UNIT_DIR "lib/systemd/system/" CACHE PATH "Where to install systemd unit to.")
@@ -29,13 +29,13 @@ string(STRIP ${GCC_TARGET_TRIPLE} GCC_TARGET_TRIPLE)
 message(STATUS "Target triple: ${GCC_TARGET_TRIPLE}")
 
 # Add libusb project.
-if(ipo_avail)
-  set(LIBUSB_CFLAGS "${CMAKE_C_FLAGS} -flto")
-  set(LIBUSB_CXXFLAGS "${CMAKE_CXX_FLAGS} -flto")
-else()
-  set(LIBUSB_CFLAGS "${CMAKE_C_FLAGS}")
-  set(LIBUSB_CXXFLAGS "${CMAKE_CXX_FLAGS}")
-endif()
+# if(ipo_avail)
+#   set(LIBUSB_CFLAGS "${CMAKE_C_FLAGS} -flto")
+#   set(LIBUSB_CXXFLAGS "${CMAKE_CXX_FLAGS} -flto")
+# else()
+#   set(LIBUSB_CFLAGS "${CMAKE_C_FLAGS}")
+#   set(LIBUSB_CXXFLAGS "${CMAKE_CXX_FLAGS}")
+# endif()
 
 include(ExternalProject)
 ExternalProject_Add(
@@ -72,10 +72,10 @@ target_link_libraries(Vision pixy2usb ntcore ${install_dir}/lib/libusb-1.0.a)
 set_property(TARGET Vision PROPERTY CXX_STANDARD 17)
 set_property(TARGET Vision PROPERTY CXX_STANDARD_REQUIRED YES)
 
-if(ipo_avail)
-  message(STATUS "IPO Enabled.")
-  set_target_properties(Vision pixy2usb ntcore PROPERTIES INTERPROCEDURAL_OPTIMIZATION TRUE)
-endif()
+# if(ipo_avail)
+#   message(STATUS "IPO Enabled.")
+#   set_target_properties(Vision pixy2usb ntcore PROPERTIES INTERPROCEDURAL_OPTIMIZATION TRUE)
+# endif()
 
 
 install(TARGETS Vision
