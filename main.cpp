@@ -2,6 +2,7 @@
 #include <cmath>
 #include <algorithm>
 #include <future>
+#include <sstream>
 
 #include <libpixyusb2.h>
 #include <gcem.hpp>
@@ -89,8 +90,11 @@ int main() {
     auto pixy_f = std::async([]() {
        std::shared_ptr<Pixy2> p(new Pixy2());
         std::cout << "Pixy Setup: Connecting to PixyCam..." << std::endl;
-        if(p->init() < 0) {
-            throw std::runtime_error("Failed to open PixyCam.");
+        int res = p->init();
+        if(res < 0) {
+            std::stringstream fmt;
+            fmt << "Failed to open PixyCam: Init returned " << res;
+            throw std::runtime_error(fmt.str());
         }
         p->getVersion();
         p->version->print();
@@ -104,9 +108,9 @@ int main() {
         p->setLamp(100, 100);
         return p;
     });
+    auto pixy = pixy_f.get();
 
     auto networktables = networktables_f.get();
-    auto pixy = pixy_f.get();
 
     auto table = networktables.GetTable("Vision");
 
