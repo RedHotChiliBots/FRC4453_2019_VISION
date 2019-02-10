@@ -3,15 +3,17 @@ ALL CHIRP COMMANDS
 These are all of the chirp commands; This info is taken from the Pixy2 firmware source code.
 NOTE: All commands, except where noted, output one int32.
 
+Some commands take a "fourcc" code (i.e. 'TEXT', 'PNT1', etc.). This needs to be investigated.
+
 Camera:
 
-- "cam_setMode"
+- cam_setMode
     in: (int8 mode)
     "Set camera mode"
     "@p mode 0=25 FPS, 1280x800; 1=50 FPS, 640x400"
     "@r 0 if success, negative if error"
 
-- "cam_getMode"
+- cam_getMode
     in: ()
     "Get camera mode"
     "@r mode value"
