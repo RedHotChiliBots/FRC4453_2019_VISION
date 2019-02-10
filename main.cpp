@@ -4,7 +4,15 @@
 #include <future>
 #include <sstream>
 
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic" // Makes dumb warnings go away.
+#endif
 #include <libpixyusb2.h>
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
+
 #include <gcem.hpp>
 #include <networktables/NetworkTableInstance.h>
 
@@ -24,6 +32,9 @@ constexpr double CAM_DOWNPITCH = deg2rad(-40.0);
 
 const camera3<double> CAMERA(vector2<double>(79.0, 52.0), deg2rad(60.0), vector3<double>(0.0, 0.0, 0.0), vector3<double>(CAM_DOWNPITCH, 0.0, 0.0)); // 79x52 for line tracking according to https://docs.pixycam.com/wiki/doku.php?id=wiki:v2:line_api#fn__3, fov of 60 degress according to https://docs.pixycam.com/wiki/doku.php?id=wiki:v2:overview
 constexpr plane3<double> FLOOR(vector3<double>(0.0, 0.0, -CAM_HEIGHT), vector3<double>(0.0, 0.0, 1.0).normalize()); 
+
+const uint32_t PIXY_FRONT_ID = 0; // TODO: Pixy camera ids.
+const uint32_t PIXY_REAR_ID = 1;
 
 std::pair<vector2<double>, vector2<double>> transform_vector(const Vector& v) {
     vector2<double> a((double)v.m_x0, (double)v.m_y0), b((double)v.m_x1, (double)v.m_y1);
@@ -74,46 +85,42 @@ public:
     }
 };
 
-int main() {
-    auto networktables_f = std::async([]() {
-        std::cout << "NT Setup: Connecting to NetworkTables..." << std::endl;
-        ConnectionWaiter waiter;
-        auto nt_inst = nt::NetworkTableInstance::GetDefault();
-        nt_inst.SetNetworkIdentity("Vision");
-        nt_inst.AddConnectionListener(waiter.listener, true);
-        nt_inst.StartClientTeam(4453);
-        waiter.wait_for_connection(std::chrono::seconds(10));
-        std::cout << "NT Setup: Connected to NetworkTables." << std::endl;
-        return nt_inst;
-    });
+class PixyFinder {
+    std::unordered_map<uint32_t, std::shared_ptr<Pixy2>> pixys;
+public:
+    size_t enumerate() {
+        while(true) {
+            std::shared_ptr<Pixy2> pixy(new Pixy2());
+            if(pixy->init() < 0) {
+                break;
+            }
 
-    auto pixy_f = std::async([]() {
-       std::shared_ptr<Pixy2> p(new Pixy2());
-        std::cout << "Pixy Setup: Connecting to PixyCam..." << std::endl;
-        int res = p->init();
-        if(res < 0) {
-            std::stringstream fmt;
-            fmt << "Failed to open PixyCam: Init returned " << res;
-            throw std::runtime_error(fmt.str());
+            std::vector<uint8_t> id(8);
+
+            int uid = pixy->m_link.callChirp("getUID");
+            if (uid < 0) {
+                break;
+            }
+            pixys.insert(std::make_pair((uint32_t)uid, std::shared_ptr(pixy)));
         }
-        p->getVersion();
-        p->version->print();
-        std::cout << "Pixy Setup: USB Bus: " << (int)p->m_link.getUSBBus() << std::endl;
-        std::cout << "Pixy Setup: USB Path: " << std::endl;
-        uint8_t ports[7];
-        size_t num_ports = p->m_link.getUSBPorts(ports, 7);
-        for(size_t i = 0; i < num_ports; i++) {
-            std::cout << i << "Pixy Setup: >> port " << (int)ports[i] << std::endl;
+
+#ifndef NDEBUG
+        for(const auto& i : pixys) {
+            std::cout << "Pixy ids: " << std::endl;
+            std::cout << ">> " << (int)i.first << std::endl;
         }
-        p->setLamp(100, 100);
-        return p;
-    });
-    auto pixy = pixy_f.get();
+#endif
 
-    auto networktables = networktables_f.get();
+        return pixys.size();
+    }
 
-    auto table = networktables.GetTable("Vision");
+    std::shared_ptr<Pixy2> get(uint32_t id) {
+        return pixys.at(id);
+    }
 
+};
+
+void thread_fn(std::shared_ptr<Pixy2> pixy, std::shared_ptr<nt::NetworkTable> table) {
     while(true) {
         pixy->line.getMainFeatures(LINE_VECTOR, true);
         
@@ -142,9 +149,48 @@ int main() {
 
             table->PutNumber("Turn", turn);
             table->PutNumber("Strafe", strafe);
-            networktables.Flush();
+            table->GetInstance().Flush();
         }
 
         table->PutNumber("NumVectors", pixy->line.numVectors);
     }
+}
+
+int main() {
+    auto networktables_f = std::async([]() {
+        std::cout << "NT Setup: Connecting to NetworkTables..." << std::endl;
+        ConnectionWaiter waiter;
+        auto nt_inst = nt::NetworkTableInstance::GetDefault();
+        nt_inst.SetNetworkIdentity("Vision");
+        nt_inst.AddConnectionListener(waiter.listener, true);
+        nt_inst.StartClientTeam(4453);
+        waiter.wait_for_connection(std::chrono::seconds(10));
+        std::cout << "NT Setup: Connected to NetworkTables." << std::endl;
+        return nt_inst;
+    });
+
+    auto pixys_f = std::async([]() {
+        PixyFinder p;
+        p.enumerate();
+        return p;
+    });
+
+    std::shared_ptr<Pixy2> front_pixy;
+    std::shared_ptr<Pixy2> rear_pixy;
+
+    {
+        auto pixys = pixys_f.get();
+        front_pixy = pixys.get(PIXY_FRONT_ID);
+        rear_pixy = pixys.get(PIXY_REAR_ID);
+    }
+
+    auto networktables = networktables_f.get();
+
+    auto table = networktables.GetTable("Vision");
+
+    auto front_table = table->GetSubTable("Front");
+    auto rear_table = table->GetSubTable("Rear");
+
+    std::thread thread_front(thread_fn, front_pixy, front_table);
+    std::thread thread_rear(thread_fn, rear_pixy, rear_table);
 }
