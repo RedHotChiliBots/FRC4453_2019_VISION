@@ -49,18 +49,19 @@ class ConnectionWaiter {
 public:
     struct Listener {
         std::shared_ptr<std::promise<void>> p;
-        bool is_notified = false;
-        Listener() : p(new std::promise<void>()) {} 
-        Listener(const Listener& l) : p(l.p) {}
-        Listener(Listener&& l) : p(std::move(l.p)) {}
+        std::shared_ptr<bool> is_notified;
+        Listener() : p(new std::promise<void>()), is_notified(new bool(false)) {} 
+        Listener(const Listener& l) : p(l.p), is_notified(l.is_notified) {}
+        Listener(Listener&& l) : p(std::move(l.p)), is_notified(std::move(l.is_notified)) {}
+
 
         void operator()(const nt::ConnectionNotification& event) {
             std::cout << "NT Listener: connected: " << event.connected;
             if(event.connected) {
-                if(!is_notified)
+                if(!*is_notified)
                 {
                     p->set_value();
-                    is_notified = true;
+                    *is_notified = true;
                 }
                 std::cout << ", id: " << event.conn.remote_id << ", ip: " << event.conn.remote_ip << ":" << event.conn.remote_port;
             }
