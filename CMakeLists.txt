@@ -1,8 +1,9 @@
 cmake_minimum_required (VERSION 2.6)
 project (Vision)
-cmake_policy(SET CMP0069 NEW)
 
-include(CheckIPOSupported)
+#cmake_policy(SET CMP0069 NEW)
+
+#include(CheckIPOSupported)
 
 # check_ipo_supported(RESULT ipo_avail)
 
@@ -68,7 +69,7 @@ target_include_directories(pixy2usb PUBLIC libs/pixy2/src/common/inc libs/pixy2/
 add_executable(Vision main.cpp geom.hpp cammath.hpp)
 target_include_directories(Vision PUBLIC libs/pixy2/src/host/libpixyusb2/include libs/gcem/include libs/allwpilib/ntcore/src/main/native/include)
 add_dependencies(Vision libusb)
-target_link_libraries(Vision pixy2usb ntcore ${install_dir}/lib/libusb-1.0.a)
+target_link_libraries(Vision pixy2usb ntcore ${install_dir}/lib/libusb-1.0.a atomic -static-libstdc++ -static-libgcc)
 set_property(TARGET Vision PROPERTY CXX_STANDARD 17)
 set_property(TARGET Vision PROPERTY CXX_STANDARD_REQUIRED YES)
 
