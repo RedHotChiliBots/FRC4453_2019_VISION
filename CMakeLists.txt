@@ -42,7 +42,7 @@ endif()
 
 include(ExternalProject)
 
-if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
 ExternalProject_Add(
   libusb
   GIT_REPOSITORY https://github.com/libusb/libusb.git
@@ -50,15 +50,6 @@ ExternalProject_Add(
   BUILD_COMMAND make "CFLAGS=${LIBUSB_CFLAGS}" "CXXFLAGS=${LIBUSB_CXXFLAGS}"
   BUILD_BYPRODUCTS <INSTALL_DIR>/lib/libusb-1.0.a
 )
-else()
-ExternalProject_Add(
-  libusb
-  GIT_REPOSITORY https://github.com/libusb/libusb.git
-  CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR> --disable-shared --disable-udev "CFLAGS=${LIBUSB_CFLAGS}" "CXXFLAGS=${LIBUSB_CXXFLAGS}"
-  BUILD_COMMAND make "CFLAGS=${LIBUSB_CFLAGS}" "CXXFLAGS=${LIBUSB_CXXFLAGS}"
-  BUILD_BYPRODUCTS <INSTALL_DIR>/lib/libusb-1.0.a
-)
-endif()
 
 ExternalProject_Add_Step(
   libusb
@@ -72,17 +63,37 @@ ExternalProject_Add_Step(
 )
 
 ExternalProject_Get_Property(libusb install_dir)
+link_directories(${install_dir}/lib)
+include_directories(${install_dir}/include/libusb-1.0)
+else()
+ExternalProject_Add(
+  libusb
+  GIT_REPOSITORY https://github.com/libusb/libusb.git
+  CONFIGURE_COMMAND ""
+  BUILD_COMMAND msbuild.exe /p:Platform=x64 msvc/libusb_static_2017.vcxproj
+  BUILD_IN_SOURCE 1
+  INSTALL_COMMAND ""
+)
+
+ExternalProject_Get_Property(libusb source_dir)
+link_directories(${source_dir}/x64/Debug/lib)
+include_directories(${source_dir}/libusb)
+endif()
+
 
 # Pixy library
 add_library(pixy2usb libs/pixy2/src/common/src/chirp.cpp libs/pixy2/src/host/libpixyusb2/src/libpixyusb2.cpp libs/pixy2/src/host/libpixyusb2/src/usblink.cpp libs/pixy2/src/host/libpixyusb2/src/util.cpp)
 add_dependencies(pixy2usb libusb)
-target_include_directories(pixy2usb PUBLIC libs/pixy2/src/common/inc libs/pixy2/src/host/libpixyusb2/include libs/pixy2/src/host/arduino/libraries/Pixy2 ${install_dir}/include/libusb-1.0)
+target_include_directories(pixy2usb PUBLIC libs/pixy2/src/common/inc libs/pixy2/src/host/libpixyusb2/include libs/pixy2/src/host/arduino/libraries/Pixy2)
 
 # Main binary
 add_executable(Vision main.cpp geom.hpp cammath.hpp)
 target_include_directories(Vision PUBLIC libs/pixy2/src/host/libpixyusb2/include libs/gcem/include libs/allwpilib/ntcore/src/main/native/include)
 add_dependencies(Vision libusb)
-target_link_libraries(Vision pixy2usb ntcore ${install_dir}/lib/libusb-1.0.a atomic -static-libstdc++ -static-libgcc)
+target_link_libraries(Vision pixy2usb ntcore libusb-1.0${CMAKE_STATIC_LIBRARY_SUFFIX} )
+if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
+target_link_libraries(Vision atomic -static-libstdc++ -static-libgcc)
+endif()
 set_property(TARGET Vision PROPERTY CXX_STANDARD 17)
 set_property(TARGET Vision PROPERTY CXX_STANDARD_REQUIRED YES)
 
