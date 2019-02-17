@@ -31,6 +31,9 @@ constexpr double deg2rad(double v) {
 constexpr double CAM_HEIGHT = 4.0;
 constexpr double CAM_DOWNPITCH = deg2rad(-40.0);
 
+constexpr double LOCK_MAX_DIST = 60.0;
+constexpr double LOCK_MIN_LENGTH = 8.0;
+
 const camera3<double> CAMERA(vector2<double>(79.0, 52.0), deg2rad(60.0), vector3<double>(0.0, 0.0, 0.0), vector3<double>(CAM_DOWNPITCH, 0.0, 0.0)); // 79x52 for line tracking according to https://docs.pixycam.com/wiki/doku.php?id=wiki:v2:line_api#fn__3, fov of 60 degress according to https://docs.pixycam.com/wiki/doku.php?id=wiki:v2:overview
 constexpr plane3<double> FLOOR(vector3<double>(0.0, 0.0, -CAM_HEIGHT), vector3<double>(0.0, 0.0, 1.0).normalize()); 
 
@@ -85,6 +88,13 @@ public:
         }
         return connected.get();
     }
+
+    void wait_for_connection() {
+        if(!connected.valid()) {
+            throw std::logic_error("Future is not valid!");
+        }
+        return connected.get();
+    }
 };
 
 class PixyFinder {
@@ -127,81 +137,7 @@ public:
     }
 };
 
-
-
-class Status {
-private:
-    std::shared_ptr<nt::NetworkTable> table;
-    std::atomic<std::chrono::steady_clock::time_point> front_timestamp, rear_timestamp;
-    std::atomic<bool> front_ok, rear_ok;
-    std::atomic<bool> front_lock, rear_lock;
-    std::mutex rear_m, front_m;
-    vector2<double> front_a, front_b, rear_a, rear_b; 
-public:
-    Status(const std::shared_ptr<nt::NetworkTable>& t) : table(t) {}
-    
-    void errored(uint32_t uid) {
-        switch(uid) {
-            case PIXY_FRONT_ID:
-                front_timestamp = std::chrono::steady_clock::now();
-                front_ok.store(false);
-                break;
-            case PIXY_REAR_ID:
-                rear_timestamp = std::chrono::steady_clock::now();
-                rear_ok.store(false);
-                break;
-            default:
-                break;
-        }
-    }
-
-    void ok(uint32_t uid) {
-        switch(uid) {
-            case PIXY_FRONT_ID:
-                front_timestamp = std::chrono::steady_clock::now();
-                front_ok.store(true);
-                break;
-            case PIXY_REAR_ID:
-                rear_timestamp = std::chrono::steady_clock::now();
-                rear_ok.store(true);
-                break;
-            default:
-                break;
-        }
-    }
-
-    void update_camera(vector2<double> a, vector2<double> b, uint32_t uid) {
-        switch(uid) {
-        case PIXY_FRONT_ID:
-            {
-                std::unique_lock l(front_m);
-                front_a = a;
-                front_b = b;
-            }
-            break;
-        case PIXY_REAR_ID:
-            {
-                std::unique_lock l(rear_m);
-                rear_a = a;
-                rear_b = b;
-            }
-            break;
-        default:
-            break;
-        }
-    }
-
-    void run() {
-        while(true) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
-            //TODO: Logic to combine camera values.
-        }
-    }
-    
-};
-
-void thread_fn(std::shared_ptr<Pixy2> pixy, std::shared_ptr<nt::NetworkTable> table, std::shared_ptr<Status> status, uint32_t uid) {
+void thread_fn(std::shared_ptr<Pixy2> pixy, std::shared_ptr<nt::NetworkTable> table) {
     while(true) {
         switch(pixy->line.getMainFeatures(LINE_VECTOR, true))
         {
@@ -211,12 +147,13 @@ void thread_fn(std::shared_ptr<Pixy2> pixy, std::shared_ptr<nt::NetworkTable> ta
                 std::this_thread::yield();
                 continue;
             default:
-                status->errored(uid);
+                table->PutBoolean("Lock", false);
+                table->PutBoolean("Ok", false);
+                table->GetInstance().Flush();
                 std::this_thread::sleep_for(std::chrono::milliseconds(500));
                 continue;
         }
 
-        status->ok(uid);
 
         if(pixy->line.numVectors > 0) {
             auto the_vector = pixy->line.vectors[0];
@@ -227,7 +164,7 @@ void thread_fn(std::shared_ptr<Pixy2> pixy, std::shared_ptr<nt::NetworkTable> ta
                 auto transformed = transform_vector(the_vector);
                 a = transformed.first;
                 b = transformed.second;
-            } catch (std::bad_optional_access& e) {
+            } catch (std::bad_optional_access&) {
                 std::cout << "Vision: Error processing vectors. Skipping frame..." << std::endl;
                 continue;
             }
@@ -244,7 +181,18 @@ void thread_fn(std::shared_ptr<Pixy2> pixy, std::shared_ptr<nt::NetworkTable> ta
             table->PutNumber("Turn", turn);
             table->PutNumber("Strafe", strafe);
             table->GetInstance().Flush();
-            status->update_camera(a, b, uid);
+
+            bool lock;
+            {
+                double dist = center.magnitude();
+                auto v = b - a;
+                double len = v.magnitude();
+
+                lock = dist < LOCK_MAX_DIST && len > LOCK_MIN_LENGTH;
+            }
+
+            table->PutBoolean("Lock", lock);
+            table->PutBoolean("Ok", false);
         }
 
         table->PutNumber("NumVectors", pixy->line.numVectors);
@@ -259,7 +207,7 @@ int main() {
         nt_inst.SetNetworkIdentity("Vision");
         nt_inst.AddConnectionListener(waiter.listener, true);
         nt_inst.StartClientTeam(4453);
-        waiter.wait_for_connection(std::chrono::seconds(10));
+        waiter.wait_for_connection();
         std::cout << "NT Setup: Connected to NetworkTables." << std::endl;
         return nt_inst;
     });
@@ -286,12 +234,8 @@ int main() {
     auto front_table = table->GetSubTable("Front");
     auto rear_table = table->GetSubTable("Rear");
 
-    std::shared_ptr<Status> status(new Status(table));
-
-    std::thread thread_front(thread_fn, front_pixy, front_table, status, PIXY_FRONT_ID);
-    std::thread thread_rear(thread_fn, rear_pixy, rear_table, status, PIXY_REAR_ID);
-
-    status->run();
+    std::thread thread_front(thread_fn, front_pixy, front_table);
+    std::thread thread_rear(thread_fn, rear_pixy, rear_table);
 
     thread_front.join();
     thread_rear.join();
