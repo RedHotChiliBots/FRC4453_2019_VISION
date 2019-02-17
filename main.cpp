@@ -33,8 +33,8 @@ constexpr double CAM_DOWNPITCH = deg2rad(-40.0);
 const camera3<double> CAMERA(vector2<double>(79.0, 52.0), deg2rad(60.0), vector3<double>(0.0, 0.0, 0.0), vector3<double>(CAM_DOWNPITCH, 0.0, 0.0)); // 79x52 for line tracking according to https://docs.pixycam.com/wiki/doku.php?id=wiki:v2:line_api#fn__3, fov of 60 degress according to https://docs.pixycam.com/wiki/doku.php?id=wiki:v2:overview
 constexpr plane3<double> FLOOR(vector3<double>(0.0, 0.0, -CAM_HEIGHT), vector3<double>(0.0, 0.0, 1.0).normalize()); 
 
-const uint32_t PIXY_FRONT_ID = 0; // TODO: Pixy camera ids.
-const uint32_t PIXY_REAR_ID = 1;
+const uint32_t PIXY_FRONT_ID = 0xE4E35363;
+const uint32_t PIXY_REAR_ID = 0xF1435B59;
 
 std::pair<vector2<double>, vector2<double>> transform_vector(const Vector& v) {
     vector2<double> a((double)v.m_x0, (double)v.m_y0), b((double)v.m_x1, (double)v.m_y1);
@@ -49,18 +49,19 @@ class ConnectionWaiter {
 public:
     struct Listener {
         std::shared_ptr<std::promise<void>> p;
-        bool is_notified = false;
-        Listener() : p(new std::promise<void>()) {} 
-        Listener(const Listener& l) : p(l.p) {}
-        Listener(Listener&& l) : p(std::move(l.p)) {}
+        std::shared_ptr<bool> is_notified;
+        Listener() : p(new std::promise<void>()), is_notified(new bool(false)) {} 
+        Listener(const Listener& l) : p(l.p), is_notified(l.is_notified) {}
+        Listener(Listener&& l) : p(std::move(l.p)), is_notified(std::move(l.is_notified)) {}
+
 
         void operator()(const nt::ConnectionNotification& event) {
             std::cout << "NT Listener: connected: " << event.connected;
             if(event.connected) {
-                if(!is_notified)
+                if(!*is_notified)
                 {
                     p->set_value();
-                    is_notified = true;
+                    *is_notified = true;
                 }
                 std::cout << ", id: " << event.conn.remote_id << ", ip: " << event.conn.remote_ip << ":" << event.conn.remote_port;
             }
@@ -89,27 +90,33 @@ class PixyFinder {
     std::unordered_map<uint32_t, std::shared_ptr<Pixy2>> pixys;
 public:
     size_t enumerate() {
+	std::cout << "Enumerating Pixys..." << std::endl;
         while(true) {
             std::shared_ptr<Pixy2> pixy(new Pixy2());
-            if(pixy->init() < 0) {
+            int res = pixy->init();
+	    if(res < 0) {
+		std::cout << "Done! Code: " << res << std::endl;
                 break;
             }
 
             std::vector<uint8_t> id(8);
 
-            int uid = pixy->m_link.callChirp("getUID");
-            if (uid < 0) {
+	    uint32_t uid = 0;
+            res = pixy->m_link.callChirp("getUID", END_OUT_ARGS, &uid, END_IN_ARGS);
+            if (res < 0) {
+		std::cout << "Done! Code: " << res << std::endl;
                 break;
             }
             pixys.insert(std::make_pair((uint32_t)uid, std::shared_ptr(pixy)));
+	    std::cout << "Found!" << std::endl;
         }
 
-#ifndef NDEBUG
+//#ifndef NDEBUG
+        std::cout << "Pixy ids: " << std::endl;
         for(const auto& i : pixys) {
-            std::cout << "Pixy ids: " << std::endl;
-            std::cout << ">> " << (int)i.first << std::endl;
+            std::cout << ">> " << std::hex << i.first << std::dec << std::endl;
         }
-#endif
+//#endif
 
         return pixys.size();
     }
@@ -117,7 +124,6 @@ public:
     std::shared_ptr<Pixy2> get(uint32_t id) {
         return pixys.at(id);
     }
-
 };
 
 void thread_fn(std::shared_ptr<Pixy2> pixy, std::shared_ptr<nt::NetworkTable> table) {
@@ -138,10 +144,10 @@ void thread_fn(std::shared_ptr<Pixy2> pixy, std::shared_ptr<nt::NetworkTable> ta
                 continue;
             }
 
-            table->PutNumber("VectorX1", a.x);
-            table->PutNumber("VectorY1", a.y);
-            table->PutNumber("VectorX2", b.x);
-            table->PutNumber("VectorY2", b.y);
+//            table->PutNumber("VectorX1", a.x);
+//            table->PutNumber("VectorY1", a.y);
+//            table->PutNumber("VectorX2", b.x);
+//            table->PutNumber("VectorY2", b.y);
 
             double turn = rad2deg(std::atan2(b.y - a.y, b.x - a.x)) + 90;
             vector2<double> center = (a + b) / 2.0;
@@ -193,4 +199,7 @@ int main() {
 
     std::thread thread_front(thread_fn, front_pixy, front_table);
     std::thread thread_rear(thread_fn, rear_pixy, rear_table);
+
+    thread_front.join();
+    thread_rear.join();
 }
