@@ -24,9 +24,11 @@ set(WITHOUT_ALLWPILIB ON CACHE BOOL "Don't build allwpilib (removes OpenCV requi
 add_subdirectory(libs/allwpilib)
 
 # Get our target triple (needed to configure libusb).
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
 execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpmachine OUTPUT_VARIABLE GCC_TARGET_TRIPLE)
 string(STRIP ${GCC_TARGET_TRIPLE} GCC_TARGET_TRIPLE)
 message(STATUS "Target triple: ${GCC_TARGET_TRIPLE}")
+endif()
 
 # Add libusb project.
 # if(ipo_avail)
@@ -38,6 +40,8 @@ message(STATUS "Target triple: ${GCC_TARGET_TRIPLE}")
 # endif()
 
 include(ExternalProject)
+
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
 ExternalProject_Add(
   libusb
   GIT_REPOSITORY https://github.com/libusb/libusb.git
@@ -45,6 +49,15 @@ ExternalProject_Add(
   BUILD_COMMAND make "CFLAGS=${LIBUSB_CFLAGS}" "CXXFLAGS=${LIBUSB_CXXFLAGS}"
   BUILD_BYPRODUCTS <INSTALL_DIR>/lib/libusb-1.0.a
 )
+else()
+ExternalProject_Add(
+  libusb
+  GIT_REPOSITORY https://github.com/libusb/libusb.git
+  CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR> --disable-shared --disable-udev "CFLAGS=${LIBUSB_CFLAGS}" "CXXFLAGS=${LIBUSB_CXXFLAGS}"
+  BUILD_COMMAND make "CFLAGS=${LIBUSB_CFLAGS}" "CXXFLAGS=${LIBUSB_CXXFLAGS}"
+  BUILD_BYPRODUCTS <INSTALL_DIR>/lib/libusb-1.0.a
+)
+endif()
 
 ExternalProject_Add_Step(
   libusb
