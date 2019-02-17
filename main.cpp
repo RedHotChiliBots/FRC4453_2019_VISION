@@ -94,21 +94,21 @@ public:
         while(true) {
             std::shared_ptr<Pixy2> pixy(new Pixy2());
             int res = pixy->init();
-	    if(res < 0) {
-		std::cout << "Done! Code: " << res << std::endl;
+	        if(res < 0) {
+		        std::cout << "Done! Code: " << res << std::endl;
                 break;
             }
 
             std::vector<uint8_t> id(8);
 
-	    uint32_t uid = 0;
+	        uint32_t uid = 0;
             res = pixy->m_link.callChirp("getUID", END_OUT_ARGS, &uid, END_IN_ARGS);
             if (res < 0) {
-		std::cout << "Done! Code: " << res << std::endl;
+		        std::cout << "Done! Code: " << res << std::endl;
                 break;
             }
             pixys.insert(std::make_pair((uint32_t)uid, std::shared_ptr(pixy)));
-	    std::cout << "Found!" << std::endl;
+            std::cout << "Found!" << std::endl;
         }
 
 //#ifndef NDEBUG
@@ -144,10 +144,10 @@ void thread_fn(std::shared_ptr<Pixy2> pixy, std::shared_ptr<nt::NetworkTable> ta
                 continue;
             }
 
-//            table->PutNumber("VectorX1", a.x);
-//            table->PutNumber("VectorY1", a.y);
-//            table->PutNumber("VectorX2", b.x);
-//            table->PutNumber("VectorY2", b.y);
+//          table->PutNumber("VectorX1", a.x);
+//          table->PutNumber("VectorY1", a.y);
+//          table->PutNumber("VectorX2", b.x);
+//          table->PutNumber("VectorY2", b.y);
 
             double turn = rad2deg(std::atan2(b.y - a.y, b.x - a.x)) + 90;
             vector2<double> center = (a + b) / 2.0;
