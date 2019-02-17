@@ -192,7 +192,7 @@ void thread_fn(std::shared_ptr<Pixy2> pixy, std::shared_ptr<nt::NetworkTable> ta
             }
 
             table->PutBoolean("Lock", lock);
-            table->PutBoolean("Ok", false);
+            table->PutBoolean("Ok", true);
         }
 
         table->PutNumber("NumVectors", pixy->line.numVectors);
