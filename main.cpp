@@ -1,5 +1,6 @@
-#include <iostream>
+#define _USE_MATH_DEFINES
 #include <cmath>
+#include <iostream>
 #include <algorithm>
 #include <future>
 #include <sstream>
@@ -126,10 +127,97 @@ public:
     }
 };
 
-void thread_fn(std::shared_ptr<Pixy2> pixy, std::shared_ptr<nt::NetworkTable> table) {
+
+
+class Status {
+private:
+    std::shared_ptr<nt::NetworkTable> table;
+    std::atomic<std::chrono::steady_clock::time_point> front_timestamp, rear_timestamp;
+    std::atomic<bool> front_ok, rear_ok;
+    std::atomic<bool> front_lock, rear_lock;
+    std::mutex rear_m, front_m;
+    vector2<double> front_a, front_b, rear_a, rear_b; 
+public:
+    Status(const std::shared_ptr<nt::NetworkTable>& t) : table(t) {}
+    
+    void errored(uint32_t uid) {
+        switch(uid) {
+            case PIXY_FRONT_ID:
+                front_timestamp = std::chrono::steady_clock::now();
+                front_ok.store(false);
+                break;
+            case PIXY_REAR_ID:
+                rear_timestamp = std::chrono::steady_clock::now();
+                rear_ok.store(false);
+                break;
+            default:
+                break;
+        }
+    }
+
+    void ok(uint32_t uid) {
+        switch(uid) {
+            case PIXY_FRONT_ID:
+                front_timestamp = std::chrono::steady_clock::now();
+                front_ok.store(true);
+                break;
+            case PIXY_REAR_ID:
+                rear_timestamp = std::chrono::steady_clock::now();
+                rear_ok.store(true);
+                break;
+            default:
+                break;
+        }
+    }
+
+    void update_camera(vector2<double> a, vector2<double> b, uint32_t uid) {
+        switch(uid) {
+        case PIXY_FRONT_ID:
+            {
+                std::unique_lock l(front_m);
+                front_a = a;
+                front_b = b;
+            }
+            break;
+        case PIXY_REAR_ID:
+            {
+                std::unique_lock l(rear_m);
+                rear_a = a;
+                rear_b = b;
+            }
+            break;
+        default:
+            break;
+        }
+    }
+
+    void run() {
+        while(true) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+            //TODO: Logic to combine camera values.
+        }
+    }
+    
+};
+
+void thread_fn(std::shared_ptr<Pixy2> pixy, std::shared_ptr<nt::NetworkTable> table, std::shared_ptr<Status> status, uint32_t uid) {
     while(true) {
-        pixy->line.getMainFeatures(LINE_VECTOR, true);
-        
+        switch(pixy->line.getMainFeatures(LINE_VECTOR, true))
+        {
+            case PIXY_RESULT_OK:
+                break;
+            case PIXY_RESULT_BUSY:
+                std::this_thread::yield();
+                continue;
+            default:
+                status->errored(uid);
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                continue;
+        }
+
+        status->ok(uid);
+
         if(pixy->line.numVectors > 0) {
             auto the_vector = pixy->line.vectors[0];
 
@@ -156,6 +244,7 @@ void thread_fn(std::shared_ptr<Pixy2> pixy, std::shared_ptr<nt::NetworkTable> ta
             table->PutNumber("Turn", turn);
             table->PutNumber("Strafe", strafe);
             table->GetInstance().Flush();
+            status->update_camera(a, b, uid);
         }
 
         table->PutNumber("NumVectors", pixy->line.numVectors);
@@ -197,8 +286,12 @@ int main() {
     auto front_table = table->GetSubTable("Front");
     auto rear_table = table->GetSubTable("Rear");
 
-    std::thread thread_front(thread_fn, front_pixy, front_table);
-    std::thread thread_rear(thread_fn, rear_pixy, rear_table);
+    std::shared_ptr<Status> status(new Status(table));
+
+    std::thread thread_front(thread_fn, front_pixy, front_table, status, PIXY_FRONT_ID);
+    std::thread thread_rear(thread_fn, rear_pixy, rear_table, status, PIXY_REAR_ID);
+
+    status->run();
 
     thread_front.join();
     thread_rear.join();
