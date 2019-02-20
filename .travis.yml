@@ -1,6 +1,6 @@
 dist: xenial
 language: cpp
-script: eval "CC=gcc-7 && CXX=g++-7" && mkdir -p build && cd build && cmake .. && make Vision && make test
+script: eval "CC=gcc-7 && CXX=g++-7" && mkdir -p build && cd build && cmake .. && make -j4 && make test
 compiler: gcc
 addons:
   apt:
