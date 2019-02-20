@@ -1,6 +1,8 @@
 cmake_minimum_required (VERSION 2.6)
 project (Vision)
 
+enable_testing()
+
 #cmake_policy(SET CMP0069 NEW)
 
 #include(CheckIPOSupported)
@@ -25,7 +27,7 @@ set(WITHOUT_ALLWPILIB ON CACHE BOOL "Don't build allwpilib (removes OpenCV requi
 add_subdirectory(libs/allwpilib)
 
 # Get our target triple (needed to configure libusb).
-if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 execute_process(COMMAND ${CMAKE_C_COMPILER} -dumpmachine OUTPUT_VARIABLE GCC_TARGET_TRIPLE)
 string(STRIP ${GCC_TARGET_TRIPLE} GCC_TARGET_TRIPLE)
 message(STATUS "Target triple: ${GCC_TARGET_TRIPLE}")
@@ -101,6 +103,13 @@ set_property(TARGET Vision PROPERTY CXX_STANDARD_REQUIRED YES)
 #   message(STATUS "IPO Enabled.")
 #   set_target_properties(Vision pixy2usb ntcore PROPERTIES INTERPROCEDURAL_OPTIMIZATION TRUE)
 # endif()
+
+#Tests
+add_executable(GeomTest test/test.cpp test/test.hpp test/geom.cpp geom.hpp)
+target_include_directories(GeomTest PUBLIC libs/gcem/include test)
+set_property(TARGET GeomTest PROPERTY CXX_STANDARD 17)
+set_property(TARGET GeomTest PROPERTY CXX_STANDARD_REQUIRED YES)
+add_test(geom GeomTest)
 
 
 install(TARGETS Vision
