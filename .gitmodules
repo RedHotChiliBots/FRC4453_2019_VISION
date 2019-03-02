@@ -10,3 +10,6 @@
 [submodule "libs/libusb"]
 	path = libs/libusb
 	url = https://github.com/libusb/libusb.git
+[submodule "libs/eigen"]
+	path = libs/eigen
+	url = https://github.com/eigenteam/eigen-git-mirror.git
