@@ -89,8 +89,8 @@ add_dependencies(pixy2usb libusb)
 target_include_directories(pixy2usb PUBLIC libs/pixy2/src/common/inc libs/pixy2/src/host/libpixyusb2/include libs/pixy2/src/host/arduino/libraries/Pixy2)
 
 # Main binary
-add_executable(Vision main.cpp geom.hpp cammath.hpp)
-target_include_directories(Vision PUBLIC libs/pixy2/src/host/libpixyusb2/include libs/gcem/include libs/allwpilib/ntcore/src/main/native/include)
+add_executable(Vision main.cpp cammath.hpp transform.hpp conversion.hpp)
+target_include_directories(Vision PUBLIC libs/pixy2/src/host/libpixyusb2/include libs/gcem/include libs/allwpilib/ntcore/src/main/native/include libs/eigen)
 add_dependencies(Vision libusb)
 target_link_libraries(Vision pixy2usb ntcore libusb-1.0${CMAKE_STATIC_LIBRARY_SUFFIX} )
 if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
@@ -105,12 +105,17 @@ set_property(TARGET Vision PROPERTY CXX_STANDARD_REQUIRED YES)
 # endif()
 
 #Tests
-add_executable(GeomTest test/test.cpp test/test.hpp test/geom.cpp geom.hpp)
-target_include_directories(GeomTest PUBLIC libs/gcem/include test)
-set_property(TARGET GeomTest PROPERTY CXX_STANDARD 17)
-set_property(TARGET GeomTest PROPERTY CXX_STANDARD_REQUIRED YES)
-add_test(geom GeomTest)
+add_executable(CammathTest test/test.cpp test/test.hpp test/cammath.cpp cammath.hpp)
+target_include_directories(CammathTest PUBLIC libs/gcem/include test)
+set_property(TARGET CammathTest PROPERTY CXX_STANDARD 17)
+set_property(TARGET CammathTest PROPERTY CXX_STANDARD_REQUIRED YES)
+add_test(cammath CammathTest)
 
+add_executable(TransformTest test/test.cpp test/test.hpp test/transform.cpp transform.hpp cammath.hpp)
+target_include_directories(TransformTest PUBLIC libs/gcem/include test)
+set_property(TARGET TransformTest PROPERTY CXX_STANDARD 17)
+set_property(TARGET TransformTest PROPERTY CXX_STANDARD_REQUIRED YES)
+add_test(transform TransformTest)
 
 install(TARGETS Vision
   RUNTIME 

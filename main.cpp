@@ -14,11 +14,13 @@
 #pragma GCC diagnostic pop
 #endif
 
+#include <Eigen/Eigen>
 #include <gcem.hpp>
 #include <networktables/NetworkTableInstance.h>
 
-#include "geom.hpp"
 #include "cammath.hpp"
+#include "transform.hpp"
+#include "conversion.hpp"
 
 constexpr double rad2deg(double v) {
     return v * (180.0 / M_PI);
@@ -34,20 +36,11 @@ constexpr double CAM_DOWNPITCH = deg2rad(-40.0);
 constexpr double LOCK_MAX_DIST = 60.0;
 constexpr double LOCK_MIN_LENGTH = 8.0;
 
-const camera3<double> CAMERA(vector2<double>(79.0, 52.0), deg2rad(60.0), vector3<double>(0.0, 0.0, 0.0), vector3<double>(CAM_DOWNPITCH, 0.0, 0.0)); // 79x52 for line tracking according to https://docs.pixycam.com/wiki/doku.php?id=wiki:v2:line_api#fn__3, fov of 60 degress according to https://docs.pixycam.com/wiki/doku.php?id=wiki:v2:overview
-constexpr plane3<double> FLOOR(vector3<double>(0.0, 0.0, -CAM_HEIGHT), vector3<double>(0.0, 0.0, 1.0).normalize()); 
+const camera3<double> CAMERA(Eigen::Vector2<double>(79.0, 52.0), deg2rad(60.0), Eigen::Vector3<double>(0.0, 0.0, 0.0), Eigen::Quaterniond(Eigen::AngleAxis<double>(CAM_DOWNPITCH, Eigen::Vector3d::UnitX()))); // 79x52 for line tracking according to https://docs.pixycam.com/wiki/doku.php?id=wiki:v2:line_api#fn__3, fov of 60 degress according to https://docs.pixycam.com/wiki/doku.php?id=wiki:v2:overview
+const Eigen::Hyperplane<double, 3> FLOOR(Eigen::Vector3<double>(0.0, 0.0, 1.0), Eigen::Vector3<double>(0.0, 0.0, -CAM_HEIGHT)); 
 
 const uint32_t PIXY_FRONT_ID = 0xE4E35363;
 const uint32_t PIXY_REAR_ID = 0xF1435B59;
-
-std::pair<vector2<double>, vector2<double>> transform_vector(const Vector& v) {
-    vector2<double> a((double)v.m_x0, (double)v.m_y0), b((double)v.m_x1, (double)v.m_y1);
-
-    auto a_r = CAMERA.cast_ray(a);
-    auto b_r = CAMERA.cast_ray(b);
-
-    return std::make_pair(FLOOR.ray_intersect(a_r).value().truncate(), FLOOR.ray_intersect(b_r).value().truncate());
-}
 
 class ConnectionWaiter {
 public:
@@ -158,25 +151,20 @@ void thread_fn(std::shared_ptr<Pixy2> pixy, std::shared_ptr<nt::NetworkTable> ta
         if(pixy->line.numVectors > 0) {
             auto the_vector = pixy->line.vectors[0];
 
-            vector2<double> a, b;
+            Eigen::Vector2<double> a, b;
 
-            try {
-                auto transformed = transform_vector(the_vector);
-                a = transformed.first;
-                b = transformed.second;
-            } catch (std::bad_optional_access&) {
-                std::cout << "Vision: Error processing vectors. Skipping frame..." << std::endl;
-                continue;
-            }
+            auto transformed = transform_vector<double>(pixy_vec_to_vec2<double>(the_vector), CAMERA, FLOOR);
+            a = transformed.first;
+            b = transformed.second;
 
 //          table->PutNumber("VectorX1", a.x);
 //          table->PutNumber("VectorY1", a.y);
 //          table->PutNumber("VectorX2", b.x);
 //          table->PutNumber("VectorY2", b.y);
 
-            double turn = rad2deg(std::atan2(b.y - a.y, b.x - a.x)) + 90;
-            vector2<double> center = (a + b) / 2.0;
-            double strafe = center.x;
+            double turn = rad2deg(std::atan2(b.y() - a.y(), b.x() - a.x())) + 90;
+            Eigen::Vector2<double> center = (a + b) / 2.0;
+            double strafe = center.x();
 
             table->PutNumber("Turn", turn);
             table->PutNumber("Strafe", strafe);
@@ -184,9 +172,9 @@ void thread_fn(std::shared_ptr<Pixy2> pixy, std::shared_ptr<nt::NetworkTable> ta
 
             bool lock;
             {
-                double dist = center.magnitude();
+                double dist = center.norm();
                 auto v = b - a;
-                double len = v.magnitude();
+                double len = v.norm();
 
                 lock = dist < LOCK_MAX_DIST && len > LOCK_MIN_LENGTH;
             }

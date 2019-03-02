@@ -9,17 +9,16 @@ int main() {
 
     std::cout << "Running test suite \"" << _TESTSUITE_NAME << "\"..." << std::endl;
 
-    if(failed_tests.size() != 1)
-    {
-        std::cout << "Failures: " << std::endl;
-    } else {
-        std::cout << "Failure: " << std::endl;
-    }
-
     for(const auto& i : _TESTS) {
         std::cout << i.first << "...";
         std::cout.flush();
-        TestResult res = (i.second)();
+        TestResult res = TestResult::fail("N/A");
+        try {
+            res = (i.second)();
+        } catch (std::exception& e) {
+            std::cout << "EXCEPT" << std::endl;
+            failed_tests.push_back(std::make_pair(i.first, TestResult::fail(e.what())));
+        }
         if (!res.passed()) {
             std::cout << "FAILED" << std::endl;
             failed_tests.push_back(std::make_pair(i.first, res));
