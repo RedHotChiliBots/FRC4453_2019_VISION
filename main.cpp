@@ -30,8 +30,10 @@ constexpr double deg2rad(double v) {
     return v / (180.0 / M_PI);
 }
 
-constexpr double CAM_HEIGHT = 4.0;
+constexpr double CAM_HEIGHT = 14.5;
 constexpr double CAM_DOWNPITCH = deg2rad(-40.0);
+
+constexpr double CAM_REAR_OFFSET = 2.375;
 
 constexpr double LOCK_MAX_DIST = 60.0;
 constexpr double LOCK_MIN_LENGTH = 8.0;
@@ -130,7 +132,7 @@ public:
     }
 };
 
-void thread_fn(std::shared_ptr<Pixy2> pixy, std::shared_ptr<nt::NetworkTable> table) {
+void thread_fn(std::shared_ptr<Pixy2> pixy, std::shared_ptr<nt::NetworkTable> table, uint32_t id) {
     while(true) {
         switch(pixy->line.getMainFeatures(LINE_VECTOR, true))
         {
@@ -162,13 +164,16 @@ void thread_fn(std::shared_ptr<Pixy2> pixy, std::shared_ptr<nt::NetworkTable> ta
 //          table->PutNumber("VectorX2", b.x);
 //          table->PutNumber("VectorY2", b.y);
 
-            double turn = rad2deg(std::atan2(b.y() - a.y(), b.x() - a.x())) + 90;
+            double turn = 270 - rad2deg(std::atan2(b.y() - a.y(), b.x() - a.x()));
             Eigen::Vector2<double> center = (a + b) / 2.0;
             double strafe = center.x();
 
+            if(id == PIXY_REAR_ID) {
+                strafe += CAM_REAR_OFFSET;
+            }
+
             table->PutNumber("Turn", turn);
             table->PutNumber("Strafe", strafe);
-            table->GetInstance().Flush();
 
             bool lock;
             {
@@ -181,6 +186,7 @@ void thread_fn(std::shared_ptr<Pixy2> pixy, std::shared_ptr<nt::NetworkTable> ta
 
             table->PutBoolean("Lock", lock);
             table->PutBoolean("Ok", true);
+            table->GetInstance().Flush();
         }
 
         table->PutNumber("NumVectors", pixy->line.numVectors);
@@ -222,8 +228,8 @@ int main() {
     auto front_table = table->GetSubTable("Front");
     auto rear_table = table->GetSubTable("Rear");
 
-    std::thread thread_front(thread_fn, front_pixy, front_table);
-    std::thread thread_rear(thread_fn, rear_pixy, rear_table);
+    std::thread thread_front(thread_fn, front_pixy, front_table, PIXY_FRONT_ID);
+    std::thread thread_rear(thread_fn, rear_pixy, rear_table, PIXY_REAR_ID);
 
     thread_front.join();
     thread_rear.join();
