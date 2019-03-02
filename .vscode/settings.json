@@ -86,6 +86,7 @@
         "dense": "cpp",
         "resumable": "cpp",
         "queue": "cpp",
-        "xthread": "cpp"
+        "xthread": "cpp",
+        "bvh": "cpp"
     }
 }

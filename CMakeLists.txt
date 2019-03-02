@@ -105,17 +105,17 @@ set_property(TARGET Vision PROPERTY CXX_STANDARD_REQUIRED YES)
 # endif()
 
 #Tests
-add_executable(CammathTest test/test.cpp test/test.hpp test/cammath.cpp cammath.hpp)
-target_include_directories(CammathTest PUBLIC libs/gcem/include test)
-set_property(TARGET CammathTest PROPERTY CXX_STANDARD 17)
-set_property(TARGET CammathTest PROPERTY CXX_STANDARD_REQUIRED YES)
-add_test(cammath CammathTest)
+#add_executable(CammathTest test/test.cpp test/test.hpp test/cammath.cpp cammath.hpp)
+#target_include_directories(CammathTest PUBLIC ./ libs/gcem/include test libs/eigen)
+#set_property(TARGET CammathTest PROPERTY CXX_STANDARD 17)
+#set_property(TARGET CammathTest PROPERTY CXX_STANDARD_REQUIRED YES)
+#add_test(cammath CammathTest)
 
-add_executable(TransformTest test/test.cpp test/test.hpp test/transform.cpp transform.hpp cammath.hpp)
-target_include_directories(TransformTest PUBLIC libs/gcem/include test)
-set_property(TARGET TransformTest PROPERTY CXX_STANDARD 17)
-set_property(TARGET TransformTest PROPERTY CXX_STANDARD_REQUIRED YES)
-add_test(transform TransformTest)
+#add_executable(TransformTest test/test.cpp test/test.hpp test/transform.cpp transform.hpp cammath.hpp)
+#target_include_directories(TransformTest PUBLIC ./ libs/gcem/include test libs/eigen)
+#set_property(TARGET TransformTest PROPERTY CXX_STANDARD 17)
+#set_property(TARGET TransformTest PROPERTY CXX_STANDARD_REQUIRED YES)
+#add_test(transform TransformTest)
 
 install(TARGETS Vision
   RUNTIME 
