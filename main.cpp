@@ -33,7 +33,7 @@ constexpr double deg2rad(double v) {
 constexpr double CAM_HEIGHT = 14.5;
 constexpr double CAM_DOWNPITCH = deg2rad(-40.0);
 
-constexpr double CAM_REAR_OFFSET = 2.375;
+constexpr double CAM_REAR_OFFSET = 5;
 
 constexpr double LOCK_MAX_DIST = 60.0;
 constexpr double LOCK_MIN_LENGTH = 8.0;
@@ -134,7 +134,7 @@ public:
 
 void thread_fn(std::shared_ptr<Pixy2> pixy, std::shared_ptr<nt::NetworkTable> table, uint32_t id) {
     while(true) {
-        pixy->line.getMainFeatures(LINE_VECTOR, true);
+        pixy->line.getMainFeatures(LINE_VECTOR, true)
         // switch(pixy->line.getMainFeatures(LINE_VECTOR, true))
         // {
         //     case PIXY_RESULT_OK:
@@ -165,7 +165,7 @@ void thread_fn(std::shared_ptr<Pixy2> pixy, std::shared_ptr<nt::NetworkTable> ta
 //          table->PutNumber("VectorX2", b.x);
 //          table->PutNumber("VectorY2", b.y);
 
-            double turn = 270 - rad2deg(std::atan2(b.y() - a.y(), b.x() - a.x()));
+            double turn = 90 - rad2deg(std::atan2(b.y() - a.y(), b.x() - a.x()));
             Eigen::Vector2<double> center = (a + b) / 2.0;
             double strafe = center.x();
 
