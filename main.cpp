@@ -134,20 +134,21 @@ public:
 
 void thread_fn(std::shared_ptr<Pixy2> pixy, std::shared_ptr<nt::NetworkTable> table, uint32_t id) {
     while(true) {
-        switch(pixy->line.getMainFeatures(LINE_VECTOR, true))
-        {
-            case PIXY_RESULT_OK:
-                break;
-            case PIXY_RESULT_BUSY:
-                std::this_thread::yield();
-                continue;
-            default:
-                table->PutBoolean("Lock", false);
-                table->PutBoolean("Ok", false);
-                table->GetInstance().Flush();
-                std::this_thread::sleep_for(std::chrono::milliseconds(500));
-                continue;
-        }
+        pixy->line.getMainFeatures(LINE_VECTOR, true);
+        // switch(pixy->line.getMainFeatures(LINE_VECTOR, true))
+        // {
+        //     case PIXY_RESULT_OK:
+        //         break;
+        //     case PIXY_RESULT_BUSY:
+        //         std::this_thread::yield();
+        //         continue;
+        //     default:
+        //         table->PutBoolean("Lock", false);
+        //         table->PutBoolean("Ok", false);
+        //         table->GetInstance().Flush();
+        //         std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        //         continue;
+        // }
 
 
         if(pixy->line.numVectors > 0) {
