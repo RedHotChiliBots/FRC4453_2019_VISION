@@ -15,6 +15,6 @@ std::pair<Eigen::Vector2<T>, Eigen::Vector2<T>> transform_vector(const std::pair
     std::cout << "Rb: (" << b_r.position().x() << ", " << b_r.position().y() << ", " << b_r.position().z() << "), (" << b_r.direction().x() << ", " << b_r.direction().y() << ", " << b_r.direction().z() << ")" << std::endl;
 #endif
 
-    return std::make_pair(a_r.intersectionPoint(plane).head<2>(), b_r.intersectionPoint(plane).head<2>());
+    return std::make_pair(a_r.intersectionPoint(plane).head(2), b_r.intersectionPoint(plane).head(2));
 }
 #endif
