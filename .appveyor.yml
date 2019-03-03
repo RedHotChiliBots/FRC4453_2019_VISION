@@ -3,6 +3,9 @@ platform: x64
 
 test: off
 
+install:
+  - git submodule update --init --recursive
+
 #
 # Build
 #
