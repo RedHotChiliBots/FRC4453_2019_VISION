@@ -2,6 +2,7 @@
 #define CAMMATH_H
 //#include "geom.hpp"
 #include <Eigen/Eigen>
+#include <gcem.hpp>
 
 /**
  * Represents a 3d camera.
@@ -33,7 +34,7 @@ struct camera3 {
         auto ray = cast_ray_screenspace(p);
         
         // Move and rotate 
-        return Eigen::ParametrizedLine<T, 3>(translation_inv * ray.origin(), rotation * ray.direction());
+        return Eigen::ParametrizedLine<T, 3>(translation * ray.origin(), rotation * ray.direction());
     }
 };
 

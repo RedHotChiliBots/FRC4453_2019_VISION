@@ -48,6 +48,7 @@ if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
 ExternalProject_Add(
   libusb
   GIT_REPOSITORY https://github.com/libusb/libusb.git
+  UPDATE_COMMAND ""
   CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR> --disable-shared --disable-udev --host=${GCC_TARGET_TRIPLE} "CFLAGS=${LIBUSB_CFLAGS}" "CXXFLAGS=${LIBUSB_CXXFLAGS}"
   BUILD_COMMAND make "CFLAGS=${LIBUSB_CFLAGS}" "CXXFLAGS=${LIBUSB_CXXFLAGS}"
   BUILD_BYPRODUCTS <INSTALL_DIR>/lib/libusb-1.0.a
@@ -71,6 +72,7 @@ else()
 ExternalProject_Add(
   libusb
   GIT_REPOSITORY https://github.com/libusb/libusb.git
+  UPDATE_COMMAND ""
   CONFIGURE_COMMAND ""
   BUILD_COMMAND msbuild.exe /p:Platform=x64 msvc/libusb_static_2017.vcxproj
   BUILD_IN_SOURCE 1
@@ -116,17 +118,17 @@ target_compile_definitions(VisionTest PUBLIC DEV_TEST)
 # endif()
 
 #Tests
-#add_executable(CammathTest test/test.cpp test/test.hpp test/cammath.cpp cammath.hpp)
-#target_include_directories(CammathTest PUBLIC ./ libs/gcem/include test libs/eigen)
-#set_property(TARGET CammathTest PROPERTY CXX_STANDARD 17)
-#set_property(TARGET CammathTest PROPERTY CXX_STANDARD_REQUIRED YES)
-#add_test(cammath CammathTest)
+add_executable(CammathTest test/test.cpp test/test.hpp test/cammath.cpp cammath.hpp)
+target_include_directories(CammathTest PUBLIC ./ libs/gcem/include test libs/eigen)
+set_property(TARGET CammathTest PROPERTY CXX_STANDARD 17)
+set_property(TARGET CammathTest PROPERTY CXX_STANDARD_REQUIRED YES)
+add_test(cammath CammathTest)
 
-#add_executable(TransformTest test/test.cpp test/test.hpp test/transform.cpp transform.hpp cammath.hpp)
-#target_include_directories(TransformTest PUBLIC ./ libs/gcem/include test libs/eigen)
-#set_property(TARGET TransformTest PROPERTY CXX_STANDARD 17)
-#set_property(TARGET TransformTest PROPERTY CXX_STANDARD_REQUIRED YES)
-#add_test(transform TransformTest)
+add_executable(TransformTest test/test.cpp test/test.hpp test/transform.cpp transform.hpp cammath.hpp)
+target_include_directories(TransformTest PUBLIC ./ libs/gcem/include test libs/eigen)
+set_property(TARGET TransformTest PROPERTY CXX_STANDARD 17)
+set_property(TARGET TransformTest PROPERTY CXX_STANDARD_REQUIRED YES)
+add_test(transform TransformTest)
 
 install(TARGETS Vision
   RUNTIME 
