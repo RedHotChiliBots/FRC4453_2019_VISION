@@ -6,6 +6,7 @@ After=network.target
 Type=simple
 ExecStart=/usr/bin/Vision
 Restart=always
+WorkingDirectory=/home/pi
 
 [Install]
 WantedBy=multi-user.target
