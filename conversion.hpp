@@ -3,6 +3,9 @@
 #include <Eigen/Core>
 #include "libpixyusb2.h"
 
+/**
+ * Converts a pixy vector into two Eigen vectors (one for each end).
+ */
 template<typename T>
 std::pair<Eigen::Vector2<T>, Eigen::Vector2<T>> pixy_vec_to_vec2(const Vector& v) {
     T a_x(v.m_x0);
