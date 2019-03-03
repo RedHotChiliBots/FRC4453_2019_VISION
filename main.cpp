@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <future>
 #include <sstream>
+#include <optional>
 
 #ifdef __GNUC__
 #pragma GCC diagnostic push
@@ -93,10 +94,14 @@ public:
 };
 
 class PixyFinder {
+    std::mutex m;
     std::unordered_map<uint32_t, std::shared_ptr<Pixy2>> pixys;
+    std::condition_variable do_update;
 public:
     size_t enumerate() {
-	std::cout << "Enumerating Pixys..." << std::endl;
+	    std::unique_lock lock(m);
+        do_update.wait(lock);
+        std::cout << "Enumerating Pixys..." << std::endl;
         while(true) {
             std::shared_ptr<Pixy2> pixy(new Pixy2());
             int res = pixy->init();
@@ -113,7 +118,10 @@ public:
 		        std::cout << "Done! Code: " << res << std::endl;
                 break;
             }
-            pixys.insert(std::make_pair((uint32_t)uid, std::shared_ptr(pixy)));
+            if(pixys.count(uid) == 0)
+            {
+                pixys.insert(std::make_pair((uint32_t)uid, std::shared_ptr(pixy)));
+            }
             std::cout << "Found!" << std::endl;
         }
 
@@ -123,35 +131,71 @@ public:
             std::cout << ">> " << std::hex << i.first << std::dec << std::endl;
         }
 //#endif
-
         return pixys.size();
     }
 
-    std::shared_ptr<Pixy2> get(uint32_t id) {
+    std::optional<std::shared_ptr<Pixy2>> get(uint32_t id) {
+        std::unique_lock lock(m);
+        
+        while(pixys.count(id) == 0) {
+            lock.unlock();
+            do_update.notify_one();
+            return {};
+        }
+
         return pixys.at(id);
+    }
+
+    void update() {
+        std::unique_lock lock(m);
+        lock.unlock();
+        do_update.notify_one();
+        lock.lock();
+        return;
+    }
+    
+    void update_one(uint32_t id) {
+        std::unique_lock lock(m);
+        if(pixys.count(id) > 0)
+        {
+            auto p = pixys.at(id);
+            pixys.erase(id);
+            if(!p.unique()) {
+                throw std::logic_error("Tried to update Pixy that is still being used!");
+            }
+        }
+        lock.unlock();
+        do_update.notify_one();
+        lock.lock();
+        return;
     }
 };
 
-void thread_fn(std::shared_ptr<Pixy2> pixy, std::shared_ptr<nt::NetworkTable> table, uint32_t id) {
+void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> table, uint32_t id) {
     while(true) {
-        pixy->line.getMainFeatures(LINE_VECTOR, true)
-        // switch(pixy->line.getMainFeatures(LINE_VECTOR, true))
-        // {
-        //     case PIXY_RESULT_OK:
-        //         break;
-        //     case PIXY_RESULT_BUSY:
-        //         std::this_thread::yield();
-        //         continue;
-        //     default:
-        //         table->PutBoolean("Lock", false);
-        //         table->PutBoolean("Ok", false);
-        //         table->GetInstance().Flush();
-        //         std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        //         continue;
-        // }
+        std::shared_ptr<Pixy2> pixy;
+        {
+            auto pixy_try = p->get(id);
+            if(!pixy_try.has_value()) {
+                table->PutBoolean("Lock", false);
+                table->PutBoolean("Ok", false);
+                table->GetInstance().Flush();
+                std::this_thread::yield();
+                continue;
+            }
+            pixy = pixy_try.value();
+        }
 
+        if (pixy->line.getMainFeatures(LINE_VECTOR, true) < 0) {
+            table->PutBoolean("Lock", false);
+            table->PutBoolean("Ok", false);
+            table->GetInstance().Flush();
+            pixy.reset();
+            p->update_one(id);
+            continue;
+        }
 
-        if(pixy->line.numVectors > 0) {
+        if (pixy->line.numVectors > 0) {
             auto the_vector = pixy->line.vectors[0];
 
             Eigen::Vector2<double> a, b;
@@ -159,13 +203,15 @@ void thread_fn(std::shared_ptr<Pixy2> pixy, std::shared_ptr<nt::NetworkTable> ta
             auto transformed = transform_vector<double>(pixy_vec_to_vec2<double>(the_vector), CAMERA, FLOOR);
             a = transformed.first;
             b = transformed.second;
+            
+            #ifdef DEV_TEST
+            table->PutNumber("VectorX1", a.x());
+            table->PutNumber("VectorY1", a.y());
+            table->PutNumber("VectorX2", b.x());
+            table->PutNumber("VectorY2", b.y());
+            #endif
 
-//          table->PutNumber("VectorX1", a.x);
-//          table->PutNumber("VectorY1", a.y);
-//          table->PutNumber("VectorX2", b.x);
-//          table->PutNumber("VectorY2", b.y);
-
-            double turn = 90 - rad2deg(std::atan2(b.y() - a.y(), b.x() - a.x()));
+            double turn = rad2deg(std::atan2(b.y() - a.y(), b.x() - a.x()));
             Eigen::Vector2<double> center = (a + b) / 2.0;
             double strafe = center.x();
 
@@ -197,30 +243,31 @@ void thread_fn(std::shared_ptr<Pixy2> pixy, std::shared_ptr<nt::NetworkTable> ta
 int main() {
     auto networktables_f = std::async([]() {
         std::cout << "NT Setup: Connecting to NetworkTables..." << std::endl;
-        ConnectionWaiter waiter;
         auto nt_inst = nt::NetworkTableInstance::GetDefault();
         nt_inst.SetNetworkIdentity("Vision");
+        #if DEV_TEST
+        nt_inst.StartServer();
+        #else
+        ConnectionWaiter waiter;
         nt_inst.AddConnectionListener(waiter.listener, true);
         nt_inst.StartClientTeam(4453);
         waiter.wait_for_connection();
+        #endif
         std::cout << "NT Setup: Connected to NetworkTables." << std::endl;
         return nt_inst;
     });
 
-    auto pixys_f = std::async([]() {
-        PixyFinder p;
-        p.enumerate();
-        return p;
+    std::shared_ptr<PixyFinder> p(new PixyFinder());
+
+    std::thread thread_pixyfinder([p]() {
+        while(true)
+        {
+            p->enumerate();
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
     });
 
-    std::shared_ptr<Pixy2> front_pixy;
-    std::shared_ptr<Pixy2> rear_pixy;
-
-    {
-        auto pixys = pixys_f.get();
-        front_pixy = pixys.get(PIXY_FRONT_ID);
-        rear_pixy = pixys.get(PIXY_REAR_ID);
-    }
+    p->update();
 
     auto networktables = networktables_f.get();
 
@@ -229,9 +276,10 @@ int main() {
     auto front_table = table->GetSubTable("Front");
     auto rear_table = table->GetSubTable("Rear");
 
-    std::thread thread_front(thread_fn, front_pixy, front_table, PIXY_FRONT_ID);
-    std::thread thread_rear(thread_fn, rear_pixy, rear_table, PIXY_REAR_ID);
+    std::thread thread_front(thread_fn, p, front_table, PIXY_FRONT_ID);
+    std::thread thread_rear(thread_fn, p, rear_table, PIXY_REAR_ID);
 
     thread_front.join();
     thread_rear.join();
+    thread_pixyfinder.join();
 }

@@ -87,6 +87,7 @@
         "resumable": "cpp",
         "queue": "cpp",
         "xthread": "cpp",
-        "bvh": "cpp"
+        "bvh": "cpp",
+        "xxatomic": "cpp"
     }
 }
