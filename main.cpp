@@ -231,6 +231,10 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
             a = transformed.first; // Save results.
             b = transformed.second;
             
+            if(a.y() < b.y()) {
+                std::swap(a, b); // B is bottom, A is top.
+            }
+
             #ifdef DEV_TEST
             table->PutNumber("VectorX1", a.x());
             table->PutNumber("VectorY1", a.y());
@@ -239,9 +243,11 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
             #endif
 
             // Calculate vector angle.
-            double turn = rad2deg(std::atan2(b.y() - a.y(), b.x() - a.x())); 
-            Eigen::Vector2<double> center = (a + b) / 2.0; // Get center of vector.
-            double strafe = center.x();
+            Eigen::Vector2<double> d = a - b;
+            double turn = rad2deg(std::atan(d.x() / d.y())); 
+
+            Eigen::Vector2<double> c = (a + b) / 2.0; // Get center of vector.
+            double strafe = c.x();
 
             if(id == PIXY_REAR_ID) {
                 strafe += CAM_REAR_OFFSET; // Add rear offset.
@@ -252,9 +258,8 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
 
             bool lock;
             {
-                double dist = center.norm(); // Calc distance of vector.
-                auto v = b - a;
-                double len = v.norm(); // Calc length of vector.
+                double dist = c.norm(); // Calc distance of vector.
+                double len = d.norm(); // Calc length of vector.
 
                 // Is this vector good enough?
                 lock = dist < LOCK_MAX_DIST && len > LOCK_MIN_LENGTH;
