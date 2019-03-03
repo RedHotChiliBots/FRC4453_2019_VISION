@@ -1,10 +1,14 @@
 #define _USE_MATH_DEFINES // Needed on MSVC for M_PI.
 #include <cmath>
-#include <iostream>
 #include <algorithm>
 #include <future>
 #include <sstream>
 #include <optional>
+#include <filesystem>
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/sinks/rotating_file_sink.h>
+#include "spdlog/fmt/bin_to_hex.h"
 
 #ifdef __GNUC__
 #pragma GCC diagnostic push
@@ -70,16 +74,14 @@ public:
 
         // Called by NetworkTables on a connection change event.
         void operator()(const nt::ConnectionNotification& event) {
-            std::cout << "NT Listener: connected: " << event.connected;
+            spdlog::debug("NT Listener: connected: {}", event.connected);
             if(event.connected) { // Is this a connection?
                 if(!*is_notified) // If we haven't notified...
                 {
                     p->set_value(); // Fufill the promise.
                     *is_notified = true; // Don't do this again next time.
                 }
-                std::cout << ", id: " << event.conn.remote_id << ", ip: " << event.conn.remote_ip << ":" << event.conn.remote_port;
             }
-            std::cout << std::endl;
         }
     };
 
@@ -121,32 +123,32 @@ public:
     size_t enumerate() {
 	    std::unique_lock lock(m); // Lock the mutex.
         do_update.wait(lock); // Wait for a request; implicitly unlocks mutex while waiting and relocks it after.
-        std::cout << "Enumerating Pixys..." << std::endl;
+        spdlog::debug("Enumerating Pixys...");
         while(true) {
             std::shared_ptr<Pixy2> pixy(new Pixy2()); // Create a Pixy.
             int res = pixy->init(); // Try to init it.
 	        if(res < 0) { // Failed?
-		        std::cout << "Done! Code: " << res << std::endl;
+		        spdlog::debug("Done! Code: {}", res);
                 break; // Were done, exit loop.
             }
 
 	        uint32_t uid = 0;
             res = pixy->m_link.callChirp("getUID", END_OUT_ARGS, &uid, END_IN_ARGS); // Get UID.
             if (res < 0) { // Failed?
-		        std::cout << "Done! Code: " << res << std::endl;
+		        spdlog::debug("Done! Code: {}", res);
                 break; // Were done, exit loop.
             }
             if(pixys.count(uid) == 0) // If this pixy is new (should always be true).
             {
                 pixys.insert(std::make_pair((uint32_t)uid, std::shared_ptr(pixy))); // Add pixy to our map.
             }
-            std::cout << "Found!" << std::endl;
+            spdlog::debug("Found!");
         }
 
 //#ifndef NDEBUG
-        std::cout << "Pixy ids: " << std::endl;
+        spdlog::trace("Pixy ids: ");
         for(const auto& i : pixys) {
-            std::cout << ">> " << std::hex << i.first << std::dec << std::endl;
+            spdlog::trace("  {0:x}", i.first);
         }
 //#endif
         return pixys.size();
@@ -182,7 +184,7 @@ public:
         {
             auto p = pixys.at(id); // Get it.
             pixys.erase(id); // Delete it from the map.
-            if(!p.unique()) { // Are we the only one who has it?
+            if(p.use_count() > 1) { // Are we the only one who has it?
                 // No, thats an error.
                 throw std::logic_error("Tried to update Pixy that is still being used!");
             }
@@ -275,10 +277,26 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
 }
 
 int main() {
+    {
+        auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+        console_sink->set_level(spdlog::level::debug);
+        console_sink->set_pattern("[%^%l%$] %v");
+
+        std::filesystem::create_directory("log");
+
+        auto file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>("log/Vision.txt", 1048576 * 5, 3);
+        file_sink->set_level(spdlog::level::trace);
+        file_sink->set_pattern("[%H:%M:%S %z] [%n] [%^---%L---%$] [thread %t] %v");
+        auto logger = std::shared_ptr<spdlog::logger>(new spdlog::logger("Vision", {console_sink, file_sink}));
+        logger->set_level(spdlog::level::trace);
+        spdlog::set_default_logger(logger);
+    }
+
+    spdlog::info("Vision Starting...");
 
     // In another thread, setup NetworkTables.
     auto networktables_f = std::async([]() {
-        std::cout << "NT Setup: Connecting to NetworkTables..." << std::endl;
+        spdlog::debug("NT Setup: Connecting to NetworkTables...");
         auto nt_inst = nt::NetworkTableInstance::GetDefault();
         nt_inst.SetNetworkIdentity("Vision");
         #if DEV_TEST
@@ -289,7 +307,7 @@ int main() {
         nt_inst.StartClientTeam(4453); // Start client.
         waiter.wait_for_connection(); // Wait for a connection.
         #endif
-        std::cout << "NT Setup: Connected to NetworkTables." << std::endl;
+        spdlog::debug("NT Setup: Connected to NetworkTables.");
         return nt_inst;
     });
 
@@ -317,6 +335,8 @@ int main() {
     std::thread thread_front(thread_fn, p, front_table, PIXY_FRONT_ID);
     // Thread for rear camera.
     std::thread thread_rear(thread_fn, p, rear_table, PIXY_REAR_ID);
+
+    spdlog::info("Vision Running!");
 
     // Wait for threads (which should never exit).
     thread_front.join();

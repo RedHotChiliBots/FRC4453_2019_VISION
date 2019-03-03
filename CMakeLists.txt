@@ -92,7 +92,7 @@ target_include_directories(pixy2usb PUBLIC libs/pixy2/src/common/inc libs/pixy2/
 
 # Main binary
 add_executable(Vision main.cpp cammath.hpp transform.hpp conversion.hpp)
-target_include_directories(Vision PUBLIC libs/pixy2/src/host/libpixyusb2/include libs/gcem/include libs/allwpilib/ntcore/src/main/native/include libs/eigen)
+target_include_directories(Vision PUBLIC libs/pixy2/src/host/libpixyusb2/include libs/gcem/include libs/allwpilib/ntcore/src/main/native/include libs/eigen libs/spdlog/include)
 add_dependencies(Vision libusb)
 target_link_libraries(Vision pixy2usb ntcore libusb-1.0${CMAKE_STATIC_LIBRARY_SUFFIX} )
 if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
@@ -102,7 +102,7 @@ set_property(TARGET Vision PROPERTY CXX_STANDARD 17)
 set_property(TARGET Vision PROPERTY CXX_STANDARD_REQUIRED YES)
 
 add_executable(VisionTest main.cpp cammath.hpp transform.hpp conversion.hpp)
-target_include_directories(VisionTest PUBLIC libs/pixy2/src/host/libpixyusb2/include libs/gcem/include libs/allwpilib/ntcore/src/main/native/include libs/eigen)
+target_include_directories(VisionTest PUBLIC libs/pixy2/src/host/libpixyusb2/include libs/gcem/include libs/allwpilib/ntcore/src/main/native/include libs/eigen libs/spdlog/include)
 add_dependencies(VisionTest libusb)
 target_link_libraries(VisionTest pixy2usb ntcore libusb-1.0${CMAKE_STATIC_LIBRARY_SUFFIX} )
 if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")

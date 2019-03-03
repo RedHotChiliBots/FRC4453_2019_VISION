@@ -44,3 +44,5 @@ CTestTestfile.cmake
 
 build
 .vscode/c_cpp_properties.json
+
+log
