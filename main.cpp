@@ -269,28 +269,31 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
 
             table->PutBoolean("Lock", lock);
             table->PutBoolean("Ok", true);
-            table->GetInstance().Flush();
+        } else {
+            table->PutBoolean("Lock", false);
+            table->PutBoolean("Ok", true);
         }
 
         table->PutNumber("NumVectors", pixy->line.numVectors);
+        table->GetInstance().Flush();
     }
 }
 
 int main() {
-    {
-        auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-        console_sink->set_level(spdlog::level::debug);
-        console_sink->set_pattern("[%^%l%$] %v");
+    // {
+    //     auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+    //     console_sink->set_level(spdlog::level::debug);
+    //     console_sink->set_pattern("[%^%l%$] %v");
 
-        std::filesystem::create_directory("log");
+    //     std::filesystem::create_directory("log");
 
-        auto file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>("log/Vision.txt", 1048576 * 5, 3);
-        file_sink->set_level(spdlog::level::trace);
-        file_sink->set_pattern("[%H:%M:%S %z] [%n] [%^---%L---%$] [thread %t] %v");
-        auto logger = std::shared_ptr<spdlog::logger>(new spdlog::logger("Vision", {console_sink, file_sink}));
-        logger->set_level(spdlog::level::trace);
-        spdlog::set_default_logger(logger);
-    }
+    //     auto file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>("log/Vision.txt", 1048576 * 5, 3);
+    //     file_sink->set_level(spdlog::level::trace);
+    //     file_sink->set_pattern("[%H:%M:%S %z] [%n] [%^---%L---%$] [thread %t] %v");
+    //     auto logger = std::shared_ptr<spdlog::logger>(new spdlog::logger("Vision", {console_sink, file_sink}));
+    //     logger->set_level(spdlog::level::trace);
+    //     spdlog::set_default_logger(logger);
+    // }
 
     spdlog::info("Vision Starting...");
 
