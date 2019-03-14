@@ -42,8 +42,7 @@ constexpr double CAM_DOWNPITCH = deg2rad(-40.0); // Angle of camera in radians.
 
 constexpr double CAM_REAR_OFFSET = 5; // X offset of rear camera in inches. 
 
-constexpr double LOCK_MAX_DIST = 60.0; // Max distance to valid line in inches.
-constexpr double LOCK_MIN_LENGTH = 8.0; // Minimum length of valid line in inches.
+const 
 
 // The camera.
 const camera3<double> CAMERA(Eigen::Vector2<double>(79.0, 52.0), deg2rad(60.0), Eigen::Vector3<double>(0.0, 0.0, 0.0), Eigen::Quaterniond(Eigen::AngleAxis<double>(CAM_DOWNPITCH, Eigen::Vector3d::UnitX()))); // 79x52 for line tracking according to https://docs.pixycam.com/wiki/doku.php?id=wiki:v2:line_api#fn__3, fov of 60 degress according to https://docs.pixycam.com/wiki/doku.php?id=wiki:v2:overview
@@ -115,84 +114,74 @@ public:
  * Manages Pixys connected to the device.
  */
 class PixyFinder {
+    std::mutex m_update;
+    std::condition_variable do_update;
+    uint32_t id_to_update;
+
     std::mutex m; // Mutex for the map.
+    std::condition_variable update_finished;
     std::unordered_map<uint32_t, std::shared_ptr<Pixy2>> pixys; // The pixies we have.
-    std::condition_variable do_update; // Notifier that requests an update of pixys.
 public:
-    // Waits for an update request, and looks for more pixies.
-    size_t enumerate() {
-	    std::unique_lock lock(m); // Lock the mutex.
-        do_update.wait(lock); // Wait for a request; implicitly unlocks mutex while waiting and relocks it after.
-        spdlog::debug("Enumerating Pixys...");
+    void do_a_update() {
+        std::unique_lock lock(m_update);
+        do_update.wait(lock);
+        spdlog::debug("Updating pixy {0:x}", id_to_update);
+        
+        if(pixys.count(id_to_update) > 0) {
+            if(pixys.at(id_to_update).use_count() != 1) {
+                spdlog::critical("Pixy update requested, but it is in use!");
+                std::terminate();
+            }
+            pixys.erase(id_to_update);
+        }
+        
         while(true) {
-            std::shared_ptr<Pixy2> pixy(new Pixy2()); // Create a Pixy.
-            int res = pixy->init(); // Try to init it.
-	        if(res < 0) { // Failed?
-		        spdlog::debug("Done! Code: {}", res);
-                break; // Were done, exit loop.
+            std::shared_ptr<Pixy2> pixy(new Pixy2());
+            int res = pixy->init();
+	        if(res < 0) {
+		        spdlog::warn("Pixy {} not found!", id_to_update);
+                break;
             }
 
 	        uint32_t uid = 0;
             res = pixy->m_link.callChirp("getUID", END_OUT_ARGS, &uid, END_IN_ARGS); // Get UID.
-            if (res < 0) { // Failed?
-		        spdlog::debug("Done! Code: {}", res);
-                break; // Were done, exit loop.
+            if (res < 0) {
+		        spdlog::warn("Cannot get Pixy id, code {}", res);
+                break;
             }
-            if(pixys.count(uid) == 0) // If this pixy is new (should always be true).
+            if(uid == id_to_update)
             {
-                pixys.insert(std::make_pair((uint32_t)uid, std::shared_ptr(pixy))); // Add pixy to our map.
+                std::unique_lock lock2(m);
+                pixys.insert(std::make_pair((uint32_t)uid, std::shared_ptr(pixy)));
+                spdlog::debug("Found!");
+                break;
             }
-            spdlog::debug("Found!");
         }
 
-//#ifndef NDEBUG
-        spdlog::trace("Pixy ids: ");
-        for(const auto& i : pixys) {
-            spdlog::trace("  {0:x}", i.first);
-        }
-//#endif
-        return pixys.size();
+        update_finished.notify_all();
+        
+        return;
     }
 
-    // Tries to get a Pixy by id. If it is missing, requests an update.
+    // Tries to get a Pixy by id.
     std::optional<std::shared_ptr<Pixy2>> get(uint32_t id) {
         std::unique_lock lock(m); // Lock the mutex.
         
         while(pixys.count(id) == 0) { // If the pixy is missing...
-            lock.unlock(); // Let enumerate do its work.
-            do_update.notify_one(); // Request update.
             return {}; // Return nothing.
         }
-
         return pixys.at(id);
     }
 
-    // Requests an update, and waits for it to finish.
-    void update() {
-        std::unique_lock lock(m); // Lock mutex, makes sure an updates not already happening.
-        lock.unlock();
-        do_update.notify_one(); // Request update.
-        lock.lock(); // Wait for completion.
-        return;
-    }
-    
-    // Removes a Pixy if it exists, and updates.
-    void update_one(uint32_t id) {
-        std::unique_lock lock(m);
-        
-        if(pixys.count(id) > 0) // If the pixy exists...
+    void update(uint32_t id) {
         {
-            auto p = pixys.at(id); // Get it.
-            pixys.erase(id); // Delete it from the map.
-            if(p.use_count() > 1) { // Are we the only one who has it?
-                // No, thats an error.
-                throw std::logic_error("Tried to update Pixy that is still being used!");
-            }
-        } // Pixy is implicitly deleted here.
-
-        lock.unlock();
-        do_update.notify_one(); // Request update.
-        lock.lock(); // Wait for completion.
+            std::unique_lock id_lock(m_update);
+            id_to_update = id;
+            id_lock.unlock();
+        }
+        do_update.notify_one();
+        std::unique_lock lock(m);
+        update_finished.wait(lock);
         return;
     }
 };
@@ -208,92 +197,47 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
                 table->PutBoolean("Lock", false);
                 table->PutBoolean("Ok", false);
                 table->GetInstance().Flush();
-                std::this_thread::yield();
+                p->update(id);
                 continue; // Skip loop.
             }
             pixy = pixy_try.value(); // Retrieve pixy.
         } // pixy_try is deleted here.
 
-        if (pixy->line.getMainFeatures(LINE_VECTOR, true) < 0) { // Try to get vectors.
-            table->PutBoolean("Lock", false); // Failed.
-            table->PutBoolean("Ok", false);
-            table->GetInstance().Flush();
-            pixy.reset(); // Let go of pixy, needed to update.
-            p->update_one(id); // Update pixy.
-            continue; // Skip loop.
-        }
+        pixy->m_link.stop();
 
-        if (pixy->line.numVectors > 0) { // If we have some vectors...
-            auto the_vector = pixy->line.vectors[0]; // Get the best one.
+        uint8_t* frame = nullptr;
+        pixy->m_link.getRawFrame(&frame);
 
-            Eigen::Vector2<double> a, b;
 
-            // Do math to make vector into floor coordinates.
-            auto transformed = transform_vector<double>(pixy_vec_to_vec2<double>(the_vector), CAMERA, FLOOR);
-            a = transformed.first; // Save results.
-            b = transformed.second;
-            
-            if(a.y() < b.y()) {
-                std::swap(a, b); // B is bottom, A is top.
-            }
 
-            #ifdef DEV_TEST
-            table->PutNumber("VectorX1", a.x());
-            table->PutNumber("VectorY1", a.y());
-            table->PutNumber("VectorX2", b.x());
-            table->PutNumber("VectorY2", b.y());
-            #endif
+        double turn = 0; // TODO 
+        double strafe = 0; // TODO
 
-            // Calculate vector angle.
-            Eigen::Vector2<double> d = a - b;
-            double turn = rad2deg(std::atan(d.x() / d.y())); 
+        table->PutNumber("Turn", turn);
+        table->PutNumber("Strafe", strafe);
 
-            Eigen::Vector2<double> c = (a + b) / 2.0; // Get center of vector.
-            double strafe = c.x();
-
-            if(id == PIXY_REAR_ID) {
-                strafe += CAM_REAR_OFFSET; // Add rear offset.
-            }
-
-            table->PutNumber("Turn", turn);
-            table->PutNumber("Strafe", strafe);
-
-            bool lock;
-            {
-                double dist = c.norm(); // Calc distance of vector.
-                double len = d.norm(); // Calc length of vector.
-
-                // Is this vector good enough?
-                lock = dist < LOCK_MAX_DIST && len > LOCK_MIN_LENGTH;
-            }
-
-            table->PutBoolean("Lock", lock);
-            table->PutBoolean("Ok", true);
-        } else {
-            table->PutBoolean("Lock", false);
-            table->PutBoolean("Ok", true);
-        }
-
-        table->PutNumber("NumVectors", pixy->line.numVectors);
-        table->GetInstance().Flush();
+        bool lock = false;
+        // TODO
+        table->PutBoolean("Lock", lock);
+        table->PutBoolean("Ok", true);
     }
 }
 
 int main() {
-    // {
-    //     auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-    //     console_sink->set_level(spdlog::level::debug);
-    //     console_sink->set_pattern("[%^%l%$] %v");
+    {
+        auto console_sink = std::make_shared<spdlog::sinks::wincolor_stdout_sink_mt>();
+        console_sink->set_level(spdlog::level::debug);
+        console_sink->set_pattern("[%^%l%$] %v");
 
-    //     std::filesystem::create_directory("log");
+        std::filesystem::create_directory("log");
 
-    //     auto file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>("log/Vision.txt", 1048576 * 5, 3);
-    //     file_sink->set_level(spdlog::level::trace);
-    //     file_sink->set_pattern("[%H:%M:%S %z] [%n] [%^---%L---%$] [thread %t] %v");
-    //     auto logger = std::shared_ptr<spdlog::logger>(new spdlog::logger("Vision", {console_sink, file_sink}));
-    //     logger->set_level(spdlog::level::trace);
-    //     spdlog::set_default_logger(logger);
-    // }
+        auto file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>("log/Vision.txt", 1048576 * 5, 3);
+        file_sink->set_level(spdlog::level::trace);
+        file_sink->set_pattern("[%H:%M:%S %z] [%n] [%^---%L---%$] [thread %t] %v");
+        auto logger = std::shared_ptr<spdlog::logger>(new spdlog::logger("Vision", {console_sink, file_sink}));
+        logger->set_level(spdlog::level::trace);
+        spdlog::set_default_logger(logger);
+    }
 
     spdlog::info("Vision Starting...");
 
@@ -320,12 +264,14 @@ int main() {
     std::thread thread_pixyfinder([p]() {
         while(true)
         {
-            p->enumerate();
+            p->do_a_update();
             std::this_thread::sleep_for(std::chrono::seconds(1));
         }
     });
 
-    p->update(); // Run first update.
+    p->update(PIXY_FRONT_ID);
+    p->update(PIXY_REAR_ID);
+
 
     auto networktables = networktables_f.get(); // Wait for NT setup, get result.
 
