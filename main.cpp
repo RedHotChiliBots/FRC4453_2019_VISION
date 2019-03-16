@@ -44,8 +44,6 @@ constexpr double CAM_DOWNPITCH = deg2rad(-40.0); // Angle of camera in radians.
 
 constexpr double CAM_REAR_OFFSET = 5; // X offset of rear camera in inches. 
 
-const 
-
 // The camera.
 const camera3<double> CAMERA(Eigen::Vector2<double>(79.0, 52.0), deg2rad(60.0), Eigen::Vector3<double>(0.0, 0.0, 0.0), Eigen::Quaterniond(Eigen::AngleAxis<double>(CAM_DOWNPITCH, Eigen::Vector3d::UnitX()))); // 79x52 for line tracking according to https://docs.pixycam.com/wiki/doku.php?id=wiki:v2:line_api#fn__3, fov of 60 degress according to https://docs.pixycam.com/wiki/doku.php?id=wiki:v2:overview
 // The plane representing the floor.
@@ -229,10 +227,6 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
 
         std::sort(rectangles.begin(), rectangles.end(), [](const auto& a, const auto& b) {return a.size.area() < b.size.area();});
         rectangles.resize(2);
-
-
-
-        auto rect = cv::minAreaRect();
 
         double turn = 0; // TODO 
         double strafe = 0; // TODO
