@@ -13,6 +13,7 @@
 int main() {
     auto pixy = new Pixy2();
     if(pixy->init() < 0) {
+        std::cout << "Cannot open pixy!" << std::endl;
         return -1;
     }
 
@@ -20,7 +21,11 @@ int main() {
 
     cv::VideoWriter out;
     out.open("pixy.avi", cv::VideoWriter::fourcc('P', 'I', 'M', '1'), 60.0, cv::Size(PIXY2_RAW_FRAME_HEIGHT, PIXY2_RAW_FRAME_WIDTH), true);
-
+    if(!out.isOpened()) {
+        std::cout << "Cannot open file!" << std::endl;
+        return -2;
+    }
+    
     for(size_t i = 0; i < 600; i++) {
         uint8_t* bayer = nullptr;
         pixy->m_link.getRawFrame(&bayer);
