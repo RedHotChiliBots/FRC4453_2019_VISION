@@ -33,7 +33,7 @@ int main() {
         cv::Mat m_bayer(PIXY2_RAW_FRAME_HEIGHT, PIXY2_RAW_FRAME_WIDTH, CV_8U, bayer);
 
         cv::Mat frame;
-        cv::cvtColor(m_bayer, frame, cv::ColorConversionCodes::COLOR_BayerBG2BGR, 3);
+        cv::cvtColor(m_bayer, frame, cv::ColorConversionCodes::COLOR_BayerGB2BGR, 3);
 
         if(i == 0) {
             std::cout << "Real Size: " << frame.cols << ", " << frame.rows << std::endl;
