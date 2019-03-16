@@ -16,7 +16,7 @@ int main() {
     pixy->m_link.stop();
 
     cv::VideoWriter out;
-    out.open("pixy.avi");
+    out.open("pixy.avi", cv::VideoWriter::fourcc('P', 'I', 'M', '1'), 60.0, cv::Size(PIXY2_RAW_FRAME_HEIGHT, PIXY2_RAW_FRAME_WIDTH), true);
 
     for(size_t i = 0; i < 600; i++) {
         uint8_t* bayer = nullptr;
