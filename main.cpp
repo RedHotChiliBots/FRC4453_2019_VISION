@@ -52,6 +52,9 @@ const Eigen::Hyperplane<double, 3> FLOOR(Eigen::Vector3<double>(0.0, 0.0, 1.0), 
 const uint32_t PIXY_FRONT_ID = 0xE4E35363; // UID of front camera.
 const uint32_t PIXY_REAR_ID = 0xF1435B59; // UID of rear camera.
 
+const double STRIP_ANGLE_ABS = 14.5 / 2;
+const double STRIP_ANGLE_TOL = 1.5;
+
 /**
  * Listens for NetworkTable connection events, and waits for a connection.
  */
@@ -224,9 +227,28 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
         for(const auto c : contours) {
             rectangles.push_back(cv::minAreaRect(c));
         }
+        
+        std::remove_if(rectangles.begin(), rectangles.end(), [](const auto& r) {return (r.angle - STRIP_ANGLE_ABS) > STRIP_ANGLE_TOL;});
 
         std::sort(rectangles.begin(), rectangles.end(), [](const auto& a, const auto& b) {return a.size.area() < b.size.area();});
+
+        if(rectangles.size() < 2) {
+            table->PutBoolean("Lock", false);
+            table->PutBoolean("Ok", true);
+        }
+
         rectangles.resize(2);
+
+        cv::RotatedRect left = rectangles[0];
+        cv::RotatedRect right = rectangles[1];
+
+        if(left.center.x > right.center.x) {
+            std::swap(left, right);
+        }
+
+
+
+        cv::solveP3P()
 
         double turn = 0; // TODO 
         double strafe = 0; // TODO

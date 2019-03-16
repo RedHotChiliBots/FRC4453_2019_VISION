@@ -120,6 +120,20 @@ target_compile_definitions(VisionTest PUBLIC DEV_TEST)
 target_include_directories(VisionTest PUBLIC libs/opencv/include ${opencv_module_include_dirs} ${CMAKE_BINARY_DIR})
 add_dependencies(VisionTest opencv_modules carotene)
 
+add_executable(PixyRec pixyrec.cpp)
+target_include_directories(PixyRec PUBLIC libs/pixy2/src/host/libpixyusb2/include)
+add_dependencies(PixyRec libusb)
+target_link_libraries(PixyRec pixy2usb opencv_core opencv_imgproc libusb-1.0${CMAKE_STATIC_LIBRARY_SUFFIX} )
+if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
+target_link_libraries(PixyRec atomic -static-libstdc++ -static-libgcc)
+endif()
+set_property(TARGET PixyRec PROPERTY CXX_STANDARD 17)
+set_property(TARGET PixyRec PROPERTY CXX_STANDARD_REQUIRED YES)
+target_include_directories(PixyRec PUBLIC libs/opencv/include ${opencv_module_include_dirs} ${CMAKE_BINARY_DIR})
+add_dependencies(PixyRec opencv_modules)
+
+
+
 # if(ipo_avail)
 #   message(STATUS "IPO Enabled.")
 #   set_target_properties(Vision pixy2usb ntcore PROPERTIES INTERPROCEDURAL_OPTIMIZATION TRUE)
