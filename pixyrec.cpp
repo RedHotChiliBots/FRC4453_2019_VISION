@@ -12,6 +12,7 @@
 
 int main() {
     auto pixy = new Pixy2();
+    pixy->init();
 
     pixy->m_link.stop();
 
