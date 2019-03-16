@@ -10,6 +10,8 @@
 #include <spdlog/sinks/rotating_file_sink.h>
 #include "spdlog/fmt/bin_to_hex.h"
 
+#include <opencv2/opencv.hpp>
+
 #ifdef __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic" // Makes dumb warnings go away.
@@ -205,10 +207,32 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
 
         pixy->m_link.stop();
 
-        uint8_t* frame = nullptr;
-        pixy->m_link.getRawFrame(&frame);
+        uint8_t* bayer = nullptr;
+        pixy->m_link.getRawFrame(&bayer);
+
+        cv::Mat m_bayer(PIXY2_RAW_FRAME_HEIGHT, PIXY2_RAW_FRAME_WIDTH, CV_8U, bayer);
+
+        cv::Mat frame, frame_hsv;
+        cv::cvtColor(m_bayer, frame, CV_BayerBG2RGB, -1);
+        cv::cvtColor(frame, frame_hsv, CV_RGB2HSV, -1);
+
+        cv::Mat green;
+        cv::inRange(frame_hsv, green, cv::Scalar(70, 0, 0), cv::Scalar(90, 255, 255));
+
+        std::vector<std::vector<cv::Point> > contours;
+        cv::findContours(green, contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_TC89_KCOS, cv::Point(0, 0));
+
+        std::vector<cv::RotatedRect> rectangles;
+        for(const auto c : contours) {
+            rectangles.push_back(cv::minAreaRect(c));
+        }
+
+        std::sort(rectangles.begin(), rectangles.end(), [](const auto& a, const auto& b) {return a.size.area() < b.size.area();});
+        retangles.resize(2);
 
 
+
+        auto rect = cv::minAreaRect();
 
         double turn = 0; // TODO 
         double strafe = 0; // TODO
@@ -225,7 +249,7 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
 
 int main() {
     {
-        auto console_sink = std::make_shared<spdlog::sinks::wincolor_stdout_sink_mt>();
+        auto console_sink = std::make_shared<spdlog::sinks::stdout_sink_mt>();
         console_sink->set_level(spdlog::level::debug);
         console_sink->set_pattern("[%^%l%$] %v");
 

@@ -25,6 +25,9 @@ set(WITHOUT_ALLWPILIB ON CACHE BOOL "Don't build allwpilib (removes OpenCV requi
 
 # Add wpilib.
 add_subdirectory(libs/allwpilib)
+add_subdirectory(libs/opencv)
+
+file(GLOB opencv_module_include_dirs libs/opencv/modules/*/include )
 
 # Get our target triple (needed to configure libusb).
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
@@ -100,6 +103,9 @@ target_link_libraries(Vision atomic -static-libstdc++ -static-libgcc)
 endif()
 set_property(TARGET Vision PROPERTY CXX_STANDARD 17)
 set_property(TARGET Vision PROPERTY CXX_STANDARD_REQUIRED YES)
+target_include_directories(Vision PUBLIC libs/opencv/include ${opencv_module_include_dirs} ${CMAKE_BINARY_DIR})
+add_dependencies(Vision opencv_modules)
+
 
 add_executable(VisionTest main.cpp cammath.hpp transform.hpp conversion.hpp)
 target_include_directories(VisionTest PUBLIC libs/pixy2/src/host/libpixyusb2/include libs/gcem/include libs/allwpilib/ntcore/src/main/native/include libs/eigen libs/spdlog/include)
@@ -111,6 +117,8 @@ endif()
 set_property(TARGET VisionTest PROPERTY CXX_STANDARD 17)
 set_property(TARGET VisionTest PROPERTY CXX_STANDARD_REQUIRED YES)
 target_compile_definitions(VisionTest PUBLIC DEV_TEST)
+target_include_directories(VisionTest PUBLIC libs/opencv/include ${opencv_module_include_dirs} ${CMAKE_BINARY_DIR})
+add_dependencies(VisionTest opencv_modules)
 
 # if(ipo_avail)
 #   message(STATUS "IPO Enabled.")
