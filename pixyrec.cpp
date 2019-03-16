@@ -20,7 +20,7 @@ int main() {
     pixy->m_link.stop();
 
     cv::VideoWriter out;
-    out.open("pixy.mjpeg", cv::VideoWriter::fourcc('M', 'J', 'P', 'G'), 60.0, cv::Size(PIXY2_RAW_FRAME_HEIGHT, PIXY2_RAW_FRAME_WIDTH), true);
+    out.open("pixy.avi", cv::VideoWriter::fourcc('M', 'J', 'P', 'G'), 60.0, cv::Size(PIXY2_RAW_FRAME_HEIGHT, PIXY2_RAW_FRAME_WIDTH), true);
     if(!out.isOpened()) {
         std::cout << "Cannot open file!" << std::endl;
         return -2;
