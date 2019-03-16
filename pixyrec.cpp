@@ -1,5 +1,5 @@
 #include <opencv2/opencv.hpp>
-
+#include <iostream>
 #ifdef __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic" // Makes dumb warnings go away.
@@ -30,5 +30,6 @@ int main() {
         cv::Mat frame;
         cv::cvtColor(m_bayer, frame, cv::ColorConversionCodes::COLOR_BayerBG2BGR, -1);
         out << frame;
+        std::cout << i << std::endl;
     }
 }
