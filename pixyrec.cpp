@@ -36,8 +36,9 @@ int main() {
         cv::cvtColor(m_bayer, frame, cv::ColorConversionCodes::COLOR_BayerBG2BGR, 3);
 
         if(i == 0) {
-            std::cout << "Size: " << frame.rows << ", " << frame.cols << std::endl;
+            std::cout << "Real Size: " << frame.rows << ", " << frame.cols << std::endl;
         }
+
         out << frame;
         std::cout << i << std::endl;
     }
