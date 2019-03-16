@@ -22,7 +22,7 @@ set(WITHOUT_JAVA ON CACHE BOOL "don't include java and JNI in the build" FORCE)
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "build with shared libs (needed for JNI)" FORCE)
 set(WITHOUT_CSCORE ON CACHE BOOL "Don't build cscore (removes OpenCV requirement)" FORCE)
 set(WITHOUT_ALLWPILIB ON CACHE BOOL "Don't build allwpilib (removes OpenCV requirement)" FORCE)
-
+set(WITH_OPENCL OFF CACHE BOOL "" FORCE)
 # Add wpilib.
 add_subdirectory(libs/allwpilib)
 add_subdirectory(libs/opencv)
