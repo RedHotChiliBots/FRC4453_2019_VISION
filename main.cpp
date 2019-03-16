@@ -247,7 +247,7 @@ int main() {
         console_sink->set_level(spdlog::level::debug);
         console_sink->set_pattern("[%^%l%$] %v");
 
-        std::filesystem::create_directory("log");
+        //std::filesystem::create_directory("log");
 
         auto file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>("log/Vision.txt", 1048576 * 5, 3);
         file_sink->set_level(spdlog::level::trace);
