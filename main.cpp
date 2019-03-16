@@ -213,14 +213,14 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
         cv::Mat m_bayer(PIXY2_RAW_FRAME_HEIGHT, PIXY2_RAW_FRAME_WIDTH, CV_8U, bayer);
 
         cv::Mat frame, frame_hsv;
-        cv::cvtColor(m_bayer, frame, CV_BayerBG2RGB, -1);
-        cv::cvtColor(frame, frame_hsv, CV_RGB2HSV, -1);
+        cv::cvtColor(m_bayer, frame, cv::CV_BayerBG2RGB, -1);
+        cv::cvtColor(frame, frame_hsv, cv::CV_RGB2HSV, -1);
 
         cv::Mat green;
         cv::inRange(frame_hsv, green, cv::Scalar(70, 0, 0), cv::Scalar(90, 255, 255));
 
         std::vector<std::vector<cv::Point> > contours;
-        cv::findContours(green, contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_TC89_KCOS, cv::Point(0, 0));
+        cv::findContours(green, contours, cv::CV_RETR_EXTERNAL, cv::CV_CHAIN_APPROX_TC89_KCOS, cv::Point(0, 0));
 
         std::vector<cv::RotatedRect> rectangles;
         for(const auto c : contours) {
@@ -258,7 +258,7 @@ int main() {
         auto file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>("log/Vision.txt", 1048576 * 5, 3);
         file_sink->set_level(spdlog::level::trace);
         file_sink->set_pattern("[%H:%M:%S %z] [%n] [%^---%L---%$] [thread %t] %v");
-        std::vector<std::shared_ptr<spdlog::sinks::sink> > sinks = {&console_sink, &file_sink};
+        std::vector<std::shared_ptr<spdlog::sinks::sink> > sinks = {console_sink, file_sink};
         auto logger = std::shared_ptr<spdlog::logger>(new spdlog::logger("Vision", sinks.begin(), sinks.end()));
         logger->set_level(spdlog::level::trace);
         spdlog::set_default_logger(logger);
