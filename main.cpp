@@ -213,14 +213,14 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
         cv::Mat m_bayer(PIXY2_RAW_FRAME_HEIGHT, PIXY2_RAW_FRAME_WIDTH, CV_8U, bayer);
 
         cv::Mat frame, frame_hsv;
-        cv::cvtColor(m_bayer, frame, cv::CV_BayerBG2RGB, -1);
-        cv::cvtColor(frame, frame_hsv, cv::CV_RGB2HSV, -1);
+        cv::cvtColor(m_bayer, frame, cv::BayerBG2RGB, -1);
+        cv::cvtColor(frame, frame_hsv, cv::RGB2HSV, -1);
 
         cv::Mat green;
         cv::inRange(frame_hsv, green, cv::Scalar(70, 0, 0), cv::Scalar(90, 255, 255));
 
         std::vector<std::vector<cv::Point> > contours;
-        cv::findContours(green, contours, cv::CV_RETR_EXTERNAL, cv::CV_CHAIN_APPROX_TC89_KCOS, cv::Point(0, 0));
+        cv::findContours(green, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_TC89_KCOS, cv::Point(0, 0));
 
         std::vector<cv::RotatedRect> rectangles;
         for(const auto c : contours) {
