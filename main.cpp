@@ -213,8 +213,8 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
         cv::Mat m_bayer(PIXY2_RAW_FRAME_HEIGHT, PIXY2_RAW_FRAME_WIDTH, CV_8U, bayer);
 
         cv::Mat frame, frame_hsv;
-        cv::cvtColor(m_bayer, frame, cv::BayerBG2RGB, -1);
-        cv::cvtColor(frame, frame_hsv, cv::RGB2HSV, -1);
+        cv::cvtColor(m_bayer, frame, cv::ColorConversionCodes::COLOR_BayerBG2RGB, -1);
+        cv::cvtColor(frame, frame_hsv, cv::ColorConversionCodes::COLOR_RGB2HSV, -1);
 
         cv::Mat green;
         cv::inRange(frame_hsv, green, cv::Scalar(70, 0, 0), cv::Scalar(90, 255, 255));
@@ -228,7 +228,7 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
         }
 
         std::sort(rectangles.begin(), rectangles.end(), [](const auto& a, const auto& b) {return a.size.area() < b.size.area();});
-        retangles.resize(2);
+        rectangles.resize(2);
 
 
 
