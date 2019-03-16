@@ -249,7 +249,7 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
 
 int main() {
     {
-        auto console_sink = std::make_shared<spdlog::sinks::stdout_sink_mt>();
+        auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
         console_sink->set_level(spdlog::level::debug);
         console_sink->set_pattern("[%^%l%$] %v");
 
