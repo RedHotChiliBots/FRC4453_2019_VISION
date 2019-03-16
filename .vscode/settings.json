@@ -89,6 +89,13 @@
         "xthread": "cpp",
         "bvh": "cpp",
         "xxatomic": "cpp",
-        "filesystem": "cpp"
+        "filesystem": "cpp",
+        "shared_mutex": "cpp",
+        "locale": "cpp",
+        "set": "cpp",
+        "xlocbuf": "cpp",
+        "xlocmes": "cpp",
+        "xlocmon": "cpp",
+        "xloctime": "cpp"
     }
 }

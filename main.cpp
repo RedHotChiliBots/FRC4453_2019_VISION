@@ -258,7 +258,8 @@ int main() {
         auto file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>("log/Vision.txt", 1048576 * 5, 3);
         file_sink->set_level(spdlog::level::trace);
         file_sink->set_pattern("[%H:%M:%S %z] [%n] [%^---%L---%$] [thread %t] %v");
-        auto logger = std::shared_ptr<spdlog::logger>(new spdlog::logger("Vision", {console_sink, file_sink}));
+        std::vector<std::shared_ptr<spdlog::sinks::sink> > sinks = {&console_sink, &file_sink};
+        auto logger = std::shared_ptr<spdlog::logger>(new spdlog::logger("Vision", sinks.begin(), sinks.end()));
         logger->set_level(spdlog::level::trace);
         spdlog::set_default_logger(logger);
     }
