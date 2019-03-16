@@ -26,7 +26,7 @@ int main() {
         return -2;
     }
 
-    for(size_t i = 0; i < 600; i++) {
+    for(size_t i = 0; i < 1200; i++) {
         uint8_t* bayer = nullptr;
         pixy->m_link.getRawFrame(&bayer);
 
