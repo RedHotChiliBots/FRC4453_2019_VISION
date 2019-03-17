@@ -48,7 +48,7 @@ constexpr double CAM_FRONT_OFFSET = 5;
 constexpr double CAM_FOV_Y = deg2rad(60.0);
 constexpr double CAM_RES_X = 208;
 constexpr double CAM_RES_Y = 316;
-constexpr double CAM_ASPECT_RATIO = CAM_RES_YX / CAM_RES_Y;
+constexpr double CAM_ASPECT_RATIO = CAM_RES_X / CAM_RES_Y;
 constexpr double CAM_FOV_X = CAM_FOV_Y * CAM_ASPECT_RATIO;
 
 constexpr double CAM_FX_PIXEL = (CAM_RES_X/2.0) / gcem::tan(CAM_FOV_X / 2.0);
@@ -62,7 +62,7 @@ cv::Mat getCamMat() {
     //  0, Fy, Cy
     //  0,  0,  1
 
-    return (Mat_<double>(3,3) << CAM_FX_PIXEL, 0, CAM_CENTERX, 0, CAM_FY_PIXEL, CAM_CENTERY, 0, 0, 1);
+    return (cv::Mat_<double>(3,3) << CAM_FX_PIXEL, 0, CAM_CENTERX, 0, CAM_FY_PIXEL, CAM_CENTERY, 0, 0, 1);
 }
 
 constexpr uint32_t PIXY_FRONT_ID = 0xE4E35363; // UID of front camera.
@@ -89,7 +89,7 @@ constexpr double STRIP_BOTRIGHT_Y = (-STRIP_HEIGHT/2.0);
 
 // Helper function for rotation.
 constexpr double rotX(const double x, const double y, const double angle) {
-    return x * gcem::cos(angle) − y * gcem::sin(angle);
+    return x * gcem::cos(angle) - y * gcem::sin(angle);
 }
 
 // Helper function for rotation.
@@ -371,26 +371,26 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
         cv::Mat r_vec;
         cv::Mat T_cv;
 
-        cv::solvePnP(object_pts, image_pts, camMat, std::vector(), r, T, SOLVEPNP_EPNP);
+        cv::solvePnP(object_pts, image_pts, camMat, std::vector(), r_vec, T_cv, SOLVEPNP_EPNP);
         
         cv::Mat r_mat;
         cv::Rodrigues(r, r_mat);
 
-        eigen::Matrix<double, 3, 3> r_m(r_mat.ptr());
+        Eigen::Matrix<double, 3, 3> r_m(r_mat.ptr());
 
-        eigen::Quaternion<double> r(r_m);
+        Eigen::Quaternion<double> r(r_m);
 
-        eigen::Vector<double, 3> T_vec(T_cv.ptr());
-        eigen::Translation3d T(T_vec);
+        Eigen::Vector<double, 3> T_vec(T_cv.ptr());
+        Eigen::Translation3d T(T_vec);
 
         double servo_rot = table->GetDouble("ServoRot", 0);
-        eigen::Quaternion servo(eigen::EulerAnglesXYZ<double>(0, servo_rot, 0));
+        Eigen::Quaternion servo(Eigen::EulerAnglesXYZ<double>(0, servo_rot, 0));
 
-        eigen::Translation3d offset(id == PIXY_FRONT_ID ? CAM_FRONT_OFFSET : CAM_REAR_OFFSET, 0, 0);
+        Eigen::Translation3d offset(id == PIXY_FRONT_ID ? CAM_FRONT_OFFSET : CAM_REAR_OFFSET, 0, 0);
 
         auto transform = r * T * servo.inverse() * offset.inverse();
 
-        auto pos = eigen::Vector<double, 3>(0, 0, 0) * transform;
+        auto pos = Eigen::Vector<double, 3>(0, 0, 0) * transform;
 
         double turn = std::atan(pos.x() / pos.z());
         double strafe = pos.x();
