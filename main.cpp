@@ -305,6 +305,7 @@ public:
 
 // Processes vectors from a pixy and puts results in NetworkTables.
 void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> table, uint32_t id) {
+    spdlog::debug("Camera thread started for id {0:x}", id)
     while(true) { // Do this forever.
         std::shared_ptr<Pixy2> pixy;
         
@@ -414,7 +415,7 @@ int main() {
         //std::filesystem::create_directory("log");
 
         auto file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>("/var/log/Vision.txt", 1048576 * 5, 3);
-        
+
         auto logger = std::shared_ptr<spdlog::logger>(new spdlog::logger("Vision", {console_sink, file_sink}));
         logger->set_level(spdlog::level::trace);
         spdlog::set_default_logger(logger);
