@@ -384,7 +384,7 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
         Eigen::Translation3d T(T_vec);
 
         double servo_rot = deg2rad(table->GetNumber("ServoRot", 0));
-        Eigen::Quaternion servo(Eigen::AngleAxisd(servo_rot, Eigen::Vector3d::UnitY());
+        Eigen::Quaternion servo(Eigen::AngleAxisd(servo_rot, Eigen::Vector3d::UnitY()));
 
         Eigen::Translation3d offset(id == PIXY_FRONT_ID ? CAM_FRONT_OFFSET : CAM_REAR_OFFSET, 0, 0);
 
