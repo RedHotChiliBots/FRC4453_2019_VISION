@@ -344,7 +344,7 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
             rectangles.push_back(cv::minAreaRect(c));
         }
         
-        table->PutInt("NumObjects", rectangles.size());
+        table->PutNumber("NumObjects", rectangles.size());
 
         if(rectangles.size() < 2) {
             table->PutBoolean("Lock", false);
@@ -371,10 +371,10 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
         cv::Mat r_vec;
         cv::Mat T_cv;
 
-        cv::solvePnP(object_pts, image_pts, camMat, std::vector(), r_vec, T_cv, SOLVEPNP_EPNP);
+        cv::solvePnP(object_pts, image_pts, camMat, std::vector<double>(), r_vec, T_cv, cv::SOLVEPNP_EPNP);
         
         cv::Mat r_mat;
-        cv::Rodrigues(r, r_mat);
+        cv::Rodrigues(r_vec, r_mat);
 
         Eigen::Matrix<double, 3, 3> r_m(r_mat.ptr());
 
@@ -383,20 +383,25 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
         Eigen::Vector<double, 3> T_vec(T_cv.ptr());
         Eigen::Translation3d T(T_vec);
 
-        double servo_rot = table->GetDouble("ServoRot", 0);
-        Eigen::Quaternion servo(Eigen::EulerAnglesXYZ<double>(0, servo_rot, 0));
+        double servo_rot = deg2rad(table->GetNumber("ServoRot", 0));
+        Eigen::Quaternion servo(AngleAxisd(servo_rot, Vector3d::UnitY());
 
         Eigen::Translation3d offset(id == PIXY_FRONT_ID ? CAM_FRONT_OFFSET : CAM_REAR_OFFSET, 0, 0);
 
-        auto transform = r * T * servo.inverse() * offset.inverse();
+        auto transform_cam = r * T;
+        auto transform = transform_cam * servo.inverse() * offset.inverse();
 
+        auto pos_cam = Eigen::Vector<double, 3>(0, 0, 0) * transform_cam;
         auto pos = Eigen::Vector<double, 3>(0, 0, 0) * transform;
+
+        double servoError = std::atan(pos_cam.x() / pos_cam.z());
 
         double turn = std::atan(pos.x() / pos.z());
         double strafe = pos.x();
 
         table->PutNumber("Turn", rad2deg(turn));
         table->PutNumber("Strafe", rad2deg(strafe));
+        table->PutNumber("ServoError", rad2deg(servoError));
 
         table->PutBoolean("Lock", true);
         table->PutBoolean("Ok", true);
