@@ -442,6 +442,8 @@ int main() {
 
     std::shared_ptr<PixyFinder> p(new PixyFinder()); // Create PixyFinder.
 
+    spdlog::debug("Starting PixyFinder thread...");
+
     // Thread to run updates.
     std::thread thread_pixyfinder([p]() {
         while(true)
@@ -450,6 +452,8 @@ int main() {
             std::this_thread::sleep_for(std::chrono::seconds(1));
         }
     });
+
+    spdlog::debug("Started PixyFinder thread.");
 
     p->update(PIXY_FRONT_ID);
     p->update(PIXY_REAR_ID);
