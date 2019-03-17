@@ -416,7 +416,7 @@ int main() {
 
         //std::filesystem::create_directory("log");
 
-        auto file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>("log/Vision.txt", 1048576 * 5, 3);
+        auto file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>("/var/log/Vision.txt", 1048576 * 5, 3);
         file_sink->set_level(spdlog::level::trace);
         file_sink->set_pattern("[%H:%M:%S %z] [%n] [%^---%L---%$] [thread %t] %v");
         std::vector<std::shared_ptr<spdlog::sinks::sink> > sinks = {console_sink, file_sink};
