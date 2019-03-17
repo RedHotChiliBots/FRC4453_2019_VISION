@@ -255,6 +255,7 @@ public:
         std::vector<std::shared_ptr<Pixy2> > jail;
         
         while(true) {
+            spdlog::trace("Getting a pixy...");
             std::shared_ptr<Pixy2> pixy(new Pixy2());
             int res = pixy->init();
 	        if(res < 0) {
@@ -275,6 +276,7 @@ public:
                 spdlog::debug("Found!");
                 break;
             }
+            spdlog::trace("Pixy doesn't match, was {}", uid);
             jail.push_back(pixy);
         }
 
