@@ -43,17 +43,131 @@ constexpr double CAM_HEIGHT = 14.5; // Height of the camera in inches.
 constexpr double CAM_DOWNPITCH = deg2rad(-40.0); // Angle of camera in radians.
 
 constexpr double CAM_REAR_OFFSET = 5; // X offset of rear camera in inches. 
+constexpr double CAM_FRONT_OFFSET = 5;
 
-// The camera.
-const camera3<double> CAMERA(Eigen::Vector2<double>(79.0, 52.0), deg2rad(60.0), Eigen::Vector3<double>(0.0, 0.0, 0.0), Eigen::Quaterniond(Eigen::AngleAxis<double>(CAM_DOWNPITCH, Eigen::Vector3d::UnitX()))); // 79x52 for line tracking according to https://docs.pixycam.com/wiki/doku.php?id=wiki:v2:line_api#fn__3, fov of 60 degress according to https://docs.pixycam.com/wiki/doku.php?id=wiki:v2:overview
-// The plane representing the floor.
-const Eigen::Hyperplane<double, 3> FLOOR(Eigen::Vector3<double>(0.0, 0.0, 1.0), Eigen::Vector3<double>(0.0, 0.0, -CAM_HEIGHT)); 
+constexpr double CAM_FOV_Y = deg2rad(60.0);
+constexpr double CAM_RES_X = 208;
+constexpr double CAM_RES_Y = 316;
+constexpr double CAM_ASPECT_RATIO = CAM_RES_YX / CAM_RES_Y;
+constexpr double CAM_FOV_X = CAM_FOV_Y * CAM_ASPECT_RATIO;
 
-const uint32_t PIXY_FRONT_ID = 0xE4E35363; // UID of front camera.
-const uint32_t PIXY_REAR_ID = 0xF1435B59; // UID of rear camera.
+constexpr double CAM_FX_PIXEL = (CAM_RES_X/2.0) / gcem::tan(CAM_FOV_X / 2.0);
+constexpr double CAM_FY_PIXEL = (CAM_RES_Y/2.0) / gcem::tan(CAM_FOV_Y / 2.0);
 
-const double STRIP_ANGLE_ABS = 14.5 / 2;
-const double STRIP_ANGLE_TOL = 1.5;
+constexpr double CAM_CENTERX = CAM_RES_X / 2.0;
+constexpr double CAM_CENTERY = CAM_RES_Y / 2.0;
+
+cv::Mat getCamMat() {
+    // Fx,  0, Cx
+    //  0, Fy, Cy
+    //  0,  0,  1
+
+    return (Mat_<double>(3,3) << CAM_FX_PIXEL, 0, CAM_CENTERX, 0, CAM_FY_PIXEL, CAM_CENTERY, 0, 0, 1);
+}
+
+constexpr uint32_t PIXY_FRONT_ID = 0xE4E35363; // UID of front camera.
+constexpr uint32_t PIXY_REAR_ID = 0xF1435B59; // UID of rear camera.
+
+// Calculation of strip corner coordinates
+
+// Basic info from game manual.
+constexpr double STRIP_ANGLE_ABS = 14.5 / 2;
+constexpr double STRIP_ANGLE_TOL = 1.5;
+constexpr double STRIP_HEIGHT = 5.5;
+constexpr double STRIP_WIDTH = 2;
+constexpr double STRIP_OFFSET = 8/2;
+
+// Coords of unrotated strip, with center as (0,0).
+constexpr double STRIP_TOPLEFT_X = (-STRIP_WIDTH/2.0);
+constexpr double STRIP_TOPLEFT_Y = (STRIP_HEIGHT/2.0);
+constexpr double STRIP_TOPRIGHT_X = (STRIP_WIDTH/2.0);
+constexpr double STRIP_TOPRIGHT_Y = (STRIP_HEIGHT/2.0);
+constexpr double STRIP_BOTLEFT_X = (-STRIP_WIDTH/2.0);
+constexpr double STRIP_BOTLEFT_Y = (-STRIP_HEIGHT/2.0);
+constexpr double STRIP_BOTRIGHT_X = (STRIP_WIDTH/2.0);
+constexpr double STRIP_BOTRIGHT_Y = (-STRIP_HEIGHT/2.0);
+
+// Helper function for rotation.
+constexpr double rotX(const double x, const double y, const double angle) {
+    return x * gcem::cos(angle) − y * gcem::sin(angle);
+}
+
+// Helper function for rotation.
+constexpr double rotY(const double x, const double y, const double angle) {
+    return y * gcem::cos(angle) + x * gcem::sin(angle);
+}
+
+// Left strip coordinates with center as (0,0).
+constexpr double LSTRIP_TOPLEFT_X_LOCAL  = rotX(STRIP_TOPLEFT_X,  STRIP_TOPLEFT_Y,  -STRIP_ANGLE_ABS);
+constexpr double LSTRIP_TOPLEFT_Y_LOCAL  = rotY(STRIP_TOPLEFT_X,  STRIP_TOPLEFT_Y,  -STRIP_ANGLE_ABS);
+constexpr double LSTRIP_TOPRIGHT_X_LOCAL = rotX(STRIP_TOPRIGHT_X, STRIP_TOPRIGHT_Y, -STRIP_ANGLE_ABS);
+constexpr double LSTRIP_TOPRIGHT_Y_LOCAL = rotY(STRIP_TOPRIGHT_X, STRIP_TOPRIGHT_Y, -STRIP_ANGLE_ABS);
+constexpr double LSTRIP_BOTLEFT_X_LOCAL  = rotX(STRIP_BOTLEFT_X,  STRIP_BOTLEFT_Y,  -STRIP_ANGLE_ABS);
+constexpr double LSTRIP_BOTLEFT_Y_LOCAL  = rotY(STRIP_BOTLEFT_X,  STRIP_BOTLEFT_Y,  -STRIP_ANGLE_ABS);
+constexpr double LSTRIP_BOTRIGHT_X_LOCAL = rotX(STRIP_BOTRIGHT_X, STRIP_BOTRIGHT_Y, -STRIP_ANGLE_ABS);
+constexpr double LSTRIP_BOTRIGHT_Y_LOCAL = rotY(STRIP_BOTRIGHT_X, STRIP_BOTRIGHT_Y, -STRIP_ANGLE_ABS);
+
+// Right strip coordinates with center as (0,0).
+constexpr double RSTRIP_TOPLEFT_X_LOCAL  = rotX(STRIP_TOPLEFT_X,  STRIP_TOPLEFT_Y,   STRIP_ANGLE_ABS);
+constexpr double RSTRIP_TOPLEFT_Y_LOCAL  = rotY(STRIP_TOPLEFT_X,  STRIP_TOPLEFT_Y,   STRIP_ANGLE_ABS);
+constexpr double RSTRIP_TOPRIGHT_X_LOCAL = rotX(STRIP_TOPRIGHT_X, STRIP_TOPRIGHT_Y,  STRIP_ANGLE_ABS);
+constexpr double RSTRIP_TOPRIGHT_Y_LOCAL = rotY(STRIP_TOPRIGHT_X, STRIP_TOPRIGHT_Y,  STRIP_ANGLE_ABS);
+constexpr double RSTRIP_BOTLEFT_X_LOCAL  = rotX(STRIP_BOTLEFT_X,  STRIP_BOTLEFT_Y,   STRIP_ANGLE_ABS);
+constexpr double RSTRIP_BOTLEFT_Y_LOCAL  = rotY(STRIP_BOTLEFT_X,  STRIP_BOTLEFT_Y,   STRIP_ANGLE_ABS);
+constexpr double RSTRIP_BOTRIGHT_X_LOCAL = rotX(STRIP_BOTRIGHT_X, STRIP_BOTRIGHT_Y,  STRIP_ANGLE_ABS);
+constexpr double RSTRIP_BOTRIGHT_Y_LOCAL = rotY(STRIP_BOTRIGHT_X, STRIP_BOTRIGHT_Y,  STRIP_ANGLE_ABS);
+
+// Left strip coordinates.
+constexpr double LSTRIP_TOPLEFT_X  = LSTRIP_TOPLEFT_X_LOCAL  - (STRIP_OFFSET + LSTRIP_TOPRIGHT_X_LOCAL);
+constexpr double LSTRIP_TOPLEFT_Y  = LSTRIP_TOPLEFT_Y_LOCAL;
+constexpr double LSTRIP_TOPRIGHT_X = LSTRIP_TOPRIGHT_X_LOCAL - (STRIP_OFFSET + LSTRIP_TOPRIGHT_X_LOCAL);
+constexpr double LSTRIP_TOPRIGHT_Y = LSTRIP_TOPRIGHT_Y_LOCAL;
+constexpr double LSTRIP_BOTLEFT_X  = LSTRIP_BOTLEFT_X_LOCAL  - (STRIP_OFFSET + LSTRIP_TOPRIGHT_X_LOCAL);
+constexpr double LSTRIP_BOTLEFT_Y  = LSTRIP_BOTLEFT_Y_LOCAL;
+constexpr double LSTRIP_BOTRIGHT_X = LSTRIP_BOTRIGHT_X_LOCAL - (STRIP_OFFSET + LSTRIP_TOPRIGHT_X_LOCAL);
+constexpr double LSTRIP_BOTRIGHT_Y = LSTRIP_BOTRIGHT_Y_LOCAL;
+
+// Right strip coordinates.
+constexpr double RSTRIP_TOPLEFT_X  = RSTRIP_TOPLEFT_X_LOCAL  + (STRIP_OFFSET + RSTRIP_TOPLEFT_X_LOCAL);
+constexpr double RSTRIP_TOPLEFT_Y  = RSTRIP_TOPLEFT_Y_LOCAL;
+constexpr double RSTRIP_TOPRIGHT_X = RSTRIP_TOPRIGHT_X_LOCAL + (STRIP_OFFSET + RSTRIP_TOPLEFT_X_LOCAL);
+constexpr double RSTRIP_TOPRIGHT_Y = RSTRIP_TOPRIGHT_Y_LOCAL;
+constexpr double RSTRIP_BOTLEFT_X  = RSTRIP_BOTLEFT_X_LOCAL  + (STRIP_OFFSET + RSTRIP_TOPLEFT_X_LOCAL);
+constexpr double RSTRIP_BOTLEFT_Y  = RSTRIP_BOTLEFT_Y_LOCAL;
+constexpr double RSTRIP_BOTRIGHT_X = RSTRIP_BOTRIGHT_X_LOCAL + (STRIP_OFFSET + RSTRIP_TOPLEFT_X_LOCAL);
+constexpr double RSTRIP_BOTRIGHT_Y = RSTRIP_BOTRIGHT_Y_LOCAL;
+
+std::vector<cv::Point3d> getStrips() {
+    std::vector<cv::Point3d> ret;
+    ret.push_back(cv::Point3d(LSTRIP_TOPLEFT_X,  LSTRIP_TOPLEFT_Y,  0));
+    ret.push_back(cv::Point3d(LSTRIP_TOPRIGHT_X, LSTRIP_TOPRIGHT_Y, 0));
+    ret.push_back(cv::Point3d(LSTRIP_BOTLEFT_X,  LSTRIP_BOTLEFT_Y,  0));
+    ret.push_back(cv::Point3d(LSTRIP_BOTRIGHT_X, LSTRIP_BOTRIGHT_Y, 0));
+    ret.push_back(cv::Point3d(RSTRIP_TOPLEFT_X,  RSTRIP_TOPLEFT_Y,  0));
+    ret.push_back(cv::Point3d(RSTRIP_TOPRIGHT_X, RSTRIP_TOPRIGHT_Y, 0));
+    ret.push_back(cv::Point3d(RSTRIP_BOTLEFT_X,  RSTRIP_BOTLEFT_Y,  0));
+    ret.push_back(cv::Point3d(RSTRIP_BOTRIGHT_X, RSTRIP_BOTRIGHT_Y, 0));
+    return ret;
+}
+
+std::vector<cv::Point2f> pointsFromRects(cv::RotatedRect left, cv::RotatedRect right) {
+    std::vector<cv::Point2f> ret;
+
+    cv::Point2f rect_pts[4];
+
+    left.points(rect_pts);
+    ret.push_back(rect_pts[1]);
+    ret.push_back(rect_pts[2]);
+    ret.push_back(rect_pts[0]);
+    ret.push_back(rect_pts[3]);
+    
+    right.points(rect_pts);
+    ret.push_back(rect_pts[1]);
+    ret.push_back(rect_pts[2]);
+    ret.push_back(rect_pts[0]);
+    ret.push_back(rect_pts[3]);
+    return ret;
+}
 
 /**
  * Listens for NetworkTable connection events, and waits for a connection.
@@ -214,11 +328,13 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
         cv::Mat m_bayer(PIXY2_RAW_FRAME_HEIGHT, PIXY2_RAW_FRAME_WIDTH, CV_8U, bayer);
 
         cv::Mat frame, frame_hsv;
-        cv::cvtColor(m_bayer, frame, cv::ColorConversionCodes::COLOR_BayerBG2RGB, -1);
+        cv::cvtColor(m_bayer, frame, cv::ColorConversionCodes::COLOR_BayerRG2RGB, -1);
         cv::cvtColor(frame, frame_hsv, cv::ColorConversionCodes::COLOR_RGB2HSV, -1);
 
         cv::Mat green;
         cv::inRange(frame_hsv, green, cv::Scalar(70, 0, 0), cv::Scalar(90, 255, 255));
+
+        cv::rotate(green, green, cv::ROTATE_90_CLOCKWISE);
 
         std::vector<std::vector<cv::Point> > contours;
         cv::findContours(green, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_TC89_KCOS, cv::Point(0, 0));
@@ -228,14 +344,15 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
             rectangles.push_back(cv::minAreaRect(c));
         }
         
-        std::remove_if(rectangles.begin(), rectangles.end(), [](const auto& r) {return (r.angle - STRIP_ANGLE_ABS) > STRIP_ANGLE_TOL;});
-
-        std::sort(rectangles.begin(), rectangles.end(), [](const auto& a, const auto& b) {return a.size.area() < b.size.area();});
+        table->PutInt("NumObjects", rectangles.size());
 
         if(rectangles.size() < 2) {
             table->PutBoolean("Lock", false);
             table->PutBoolean("Ok", true);
+            continue;
         }
+
+        std::sort(rectangles.begin(), rectangles.end(), [](const auto& a, const auto& b) {return a.size.area() < b.size.area();});
 
         rectangles.resize(2);
 
@@ -246,19 +363,42 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
             std::swap(left, right);
         }
 
+        cv::Mat camMat = getCamMat();
 
+        auto object_pts = getStrips();
+        auto image_pts = pointsFromRects(left, right);
 
-        cv::solveP3P()
+        cv::Mat r_vec;
+        cv::Mat T_cv;
 
-        double turn = 0; // TODO 
-        double strafe = 0; // TODO
+        cv::solvePnP(object_pts, image_pts, camMat, std::vector(), r, T, SOLVEPNP_EPNP);
+        
+        cv::Mat r_mat;
+        cv::Rodrigues(r, r_mat);
 
-        table->PutNumber("Turn", turn);
-        table->PutNumber("Strafe", strafe);
+        eigen::Matrix<double, 3, 3> r_m(r_mat.ptr());
 
-        bool lock = false;
-        // TODO
-        table->PutBoolean("Lock", lock);
+        eigen::Quaternion<double> r(r_m);
+
+        eigen::Vector<double, 3> T_vec(T_cv.ptr());
+        eigen::Translation3d T(T_vec);
+
+        double servo_rot = table->GetDouble("ServoRot", 0);
+        eigen::Quaternion servo(eigen::EulerAnglesXYZ<double>(0, servo_rot, 0));
+
+        eigen::Translation3d offset(id == PIXY_FRONT_ID ? CAM_FRONT_OFFSET : CAM_REAR_OFFSET, 0, 0);
+
+        auto transform = r * T * servo.inverse() * offset.inverse();
+
+        auto pos = eigen::Vector<double, 3>(0, 0, 0) * transform;
+
+        double turn = std::atan(pos.x() / pos.z());
+        double strafe = pos.x();
+
+        table->PutNumber("Turn", rad2deg(turn));
+        table->PutNumber("Strafe", rad2deg(strafe));
+
+        table->PutBoolean("Lock", true);
         table->PutBoolean("Ok", true);
     }
 }
