@@ -251,6 +251,8 @@ public:
             }
             pixys.erase(id_to_update);
         }
+
+        std::vector<std::shared_ptr<Pixy2> > jail;
         
         while(true) {
             std::shared_ptr<Pixy2> pixy(new Pixy2());
@@ -273,6 +275,7 @@ public:
                 spdlog::debug("Found!");
                 break;
             }
+            jail.push_back(pixy);
         }
 
         update_finished.notify_all();
