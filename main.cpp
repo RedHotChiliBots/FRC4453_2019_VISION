@@ -411,7 +411,7 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
 int main() {
     {
         auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-        console_sink->set_level(spdlog::level::debug);
+        console_sink->set_level(spdlog::level::level_enum::off);
         console_sink->set_pattern("[%^%l%$] %v");
 
         //std::filesystem::create_directory("log");
@@ -419,8 +419,8 @@ int main() {
         auto file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>("/var/log/Vision.txt", 1048576 * 5, 3);
         file_sink->set_level(spdlog::level::trace);
         file_sink->set_pattern("[%H:%M:%S %z] [%n] [%^---%L---%$] [thread %t] %v");
-        std::vector<std::shared_ptr<spdlog::sinks::sink> > sinks = {console_sink, file_sink};
-        auto logger = std::shared_ptr<spdlog::logger>(new spdlog::logger("Vision", sinks.begin(), sinks.end()));
+
+        auto logger = std::shared_ptr<spdlog::logger>(new spdlog::logger("Vision", {console_sink, file_sink}));
         logger->set_level(spdlog::level::trace);
         spdlog::set_default_logger(logger);
     }
