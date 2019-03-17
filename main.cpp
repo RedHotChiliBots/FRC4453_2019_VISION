@@ -376,15 +376,15 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
         cv::Mat r_mat;
         cv::Rodrigues(r_vec, r_mat);
 
-        Eigen::Matrix<double, 3, 3> r_m(r_mat.ptr());
+        Eigen::Matrix<double, 3, 3> r_m((double*) r_mat.ptr());
 
         Eigen::Quaternion<double> r(r_m);
 
-        Eigen::Vector<double, 3> T_vec(T_cv.ptr());
+        Eigen::Vector<double, 3> T_vec((double*) T_cv.ptr());
         Eigen::Translation3d T(T_vec);
 
         double servo_rot = deg2rad(table->GetNumber("ServoRot", 0));
-        Eigen::Quaternion servo(Eigen::AngleAxisd(servo_rot, Vector3d::UnitY());
+        Eigen::Quaternion servo(Eigen::AngleAxisd(servo_rot, Eigen::Vector3d::UnitY());
 
         Eigen::Translation3d offset(id == PIXY_FRONT_ID ? CAM_FRONT_OFFSET : CAM_REAR_OFFSET, 0, 0);
 
