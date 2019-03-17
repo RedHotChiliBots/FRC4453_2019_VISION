@@ -305,7 +305,7 @@ public:
 
 // Processes vectors from a pixy and puts results in NetworkTables.
 void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> table, uint32_t id) {
-    spdlog::debug("Camera thread started for id {0:x}", id)
+    spdlog::debug("Camera thread started for id {0:x}", id);
     while(true) { // Do this forever.
         std::shared_ptr<Pixy2> pixy;
         
