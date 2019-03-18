@@ -232,6 +232,7 @@ public:
  */
 class PixyFinder {
     std::mutex m_update;
+    std::unique_lock update_lock(m_update);
     std::condition_variable do_update;
     uint32_t id_to_update;
 
@@ -240,9 +241,8 @@ class PixyFinder {
     std::unordered_map<uint32_t, std::shared_ptr<Pixy2>> pixys; // The pixies we have.
 public:
     void do_updates() {
-        std::unique_lock lock(m_update);
         while(true) {
-            do_update.wait(lock);
+            do_update.wait(update_lock);
             spdlog::debug("Updating pixy {0:x}", id_to_update);
             
             if(pixys.count(id_to_update) > 0) {
