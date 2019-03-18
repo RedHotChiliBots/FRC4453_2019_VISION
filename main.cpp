@@ -280,7 +280,7 @@ public:
             jail.push_back(pixy);
         }
 
-        std::unique_lock lock(m); // Wait a bit if we were too fast.
+        std::unique_lock lock_m(m); // Wait a bit if we were too fast.
         lock.unlock();
         update_finished.notify_all();
         
