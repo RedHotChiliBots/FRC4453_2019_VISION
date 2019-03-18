@@ -378,8 +378,8 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
         auto object_pts = getStrips();
         auto image_pts = pointsFromRects(left, right);
 
-        cv::Mat r_vec;
-        cv::Mat T_cv;
+        cv::Mat r_vec(1, 3, CV_64F);
+        cv::Mat T_cv(1, 3, CV_64F);
 
         cv::solvePnP(object_pts, image_pts, camMat, std::vector<double>(), r_vec, T_cv, cv::SOLVEPNP_EPNP);
         
