@@ -1,9 +1,9 @@
 #define _USE_MATH_DEFINES // Needed on MSVC for M_PI.
 #include <cmath>
 #include <algorithm>
+#include <future>
 #include <sstream>
 #include <optional>
-#include <filesystem>
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/rotating_file_sink.h>
