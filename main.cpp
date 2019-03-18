@@ -23,6 +23,7 @@
 #endif
 
 #include <Eigen/Core>
+#include <Eigen/Geometry>
 #include <gcem.hpp>
 #include <networktables/NetworkTableInstance.h>
 
