@@ -22,7 +22,7 @@
 #pragma GCC diagnostic pop
 #endif
 
-#include <Eigen/Dense>
+#include <Eigen/Core>
 #include <gcem.hpp>
 #include <networktables/NetworkTableInstance.h>
 
