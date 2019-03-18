@@ -285,6 +285,7 @@ public:
             std::unique_lock lock_m(m); // Wait a bit if we were too fast.
             lock_m.unlock();
             update_finished.notify_all();
+            std::this_thread::sleep_for(std::chrono::seconds(2));
         }
     }
 
