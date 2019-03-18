@@ -341,7 +341,7 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
         cv::cvtColor(m_bayer, frame, cv::ColorConversionCodes::COLOR_BayerRG2RGB, -1);
         cv::cvtColor(frame, frame_hsv, cv::ColorConversionCodes::COLOR_RGB2HSV, -1);
 
-        cv::Mat green(frame_hsv.size, CV_U8);
+        cv::Mat green(frame_hsv.size, CV_8U);
         cv::inRange(frame_hsv, cv::Scalar(70, 0, 0), cv::Scalar(90, 255, 255), green);
 
         cv::rotate(green, green, cv::ROTATE_90_CLOCKWISE);
