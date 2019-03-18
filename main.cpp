@@ -280,6 +280,8 @@ public:
             jail.push_back(pixy);
         }
 
+        std::unique_lock lock(m); // Wait a bit if we were too fast.
+        lock.unlock();
         update_finished.notify_all();
         
         return;
@@ -301,8 +303,8 @@ public:
             id_to_update = id;
             id_lock.unlock();
         }
-        do_update.notify_one();
         std::unique_lock lock(m);
+        do_update.notify_one();
         update_finished.wait(lock);
         return;
     }
