@@ -1,7 +1,6 @@
 #define _USE_MATH_DEFINES // Needed on MSVC for M_PI.
 #include <cmath>
 #include <algorithm>
-#include <future>
 #include <sstream>
 #include <optional>
 #include <filesystem>
