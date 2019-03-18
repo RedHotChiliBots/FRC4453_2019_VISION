@@ -232,7 +232,7 @@ public:
  */
 class PixyFinder {
     std::mutex m_update;
-    std::unique_lock update_lock;
+    std::unique_lock<std::mutex> update_lock;
     std::condition_variable do_update;
     uint32_t id_to_update;
 
