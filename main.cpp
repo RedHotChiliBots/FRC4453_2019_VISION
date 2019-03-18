@@ -9,7 +9,9 @@
 #include <spdlog/sinks/rotating_file_sink.h>
 #include "spdlog/fmt/bin_to_hex.h"
 
-#include <opencv2/opencv.hpp>
+#include <opencv2/core.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/calib3d.hpp>
 
 #ifdef __GNUC__
 #pragma GCC diagnostic push
@@ -20,13 +22,13 @@
 #pragma GCC diagnostic pop
 #endif
 
-#include <Eigen/Eigen>
+#include <Eigen/Dense>
 #include <gcem.hpp>
 #include <networktables/NetworkTableInstance.h>
 
-#include "cammath.hpp"
-#include "transform.hpp"
-#include "conversion.hpp"
+// #include "cammath.hpp"
+// #include "transform.hpp"
+// #include "conversion.hpp"
 
 // Converts radians to degrees.
 constexpr double rad2deg(double v) {
