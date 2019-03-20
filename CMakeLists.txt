@@ -9,12 +9,20 @@ enable_testing()
 
 # check_ipo_supported(RESULT ipo_avail)
 
+set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/libs/cotire/CMake")
+include(cotire)
+
 # Project options
 set(SYSTEMD_UNIT_DIR "lib/systemd/system/" CACHE PATH "Where to install systemd unit to.")
 
 # Set default for prefix.
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   set(CMAKE_INSTALL_PREFIX "/usr" CACHE PATH "..." FORCE)
+endif()
+
+
+if(MINGW) 
+  add_compile_definitions(_WIN32_WINNT=0x0A00)
 endif()
 
 # Options for wpilib.
@@ -41,17 +49,23 @@ message(STATUS "Target triple: ${GCC_TARGET_TRIPLE}")
 endif()
 
 # Add libusb project.
-# if(ipo_avail)
-#   set(LIBUSB_CFLAGS "${CMAKE_C_FLAGS} -flto")
-#   set(LIBUSB_CXXFLAGS "${CMAKE_CXX_FLAGS} -flto")
-# else()
-#   set(LIBUSB_CFLAGS "${CMAKE_C_FLAGS}")
-#   set(LIBUSB_CXXFLAGS "${CMAKE_CXX_FLAGS}")
-# endif()
-
 include(ExternalProject)
 
 if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
+if(MINGW)
+ExternalProject_Add(
+  libusb
+  URL https://github.com/libusb/libusb/releases/download/v1.0.22/libusb-1.0.22.7z
+  UPDATE_COMMAND ""
+  CONFIGURE_COMMAND ""
+  BUILD_COMMAND ""
+  INSTALL_COMMAND ""
+)
+
+ExternalProject_Get_Property(libusb source_dir)
+link_directories(${source_dir}/MinGW64/static)
+include_directories(${source_dir}/include/libusb-1.0)
+else()
 ExternalProject_Add(
   libusb
   GIT_REPOSITORY https://github.com/libusb/libusb.git
@@ -75,6 +89,7 @@ ExternalProject_Add_Step(
 ExternalProject_Get_Property(libusb install_dir)
 link_directories(${install_dir}/lib)
 include_directories(${install_dir}/include/libusb-1.0)
+endif()
 else()
 ExternalProject_Add(
   libusb
@@ -91,38 +106,51 @@ link_directories(${source_dir}/x64/Debug/lib)
 include_directories(${source_dir}/libusb)
 endif()
 
-
 # Pixy library
 add_library(pixy2usb libs/pixy2/src/common/src/chirp.cpp libs/pixy2/src/host/libpixyusb2/src/libpixyusb2.cpp libs/pixy2/src/host/libpixyusb2/src/usblink.cpp libs/pixy2/src/host/libpixyusb2/src/util.cpp)
 add_dependencies(pixy2usb libusb)
 target_include_directories(pixy2usb PUBLIC libs/pixy2/src/common/inc libs/pixy2/src/host/libpixyusb2/include libs/pixy2/src/host/arduino/libraries/Pixy2)
 
 # Main binary
-add_executable(Vision main.cpp cammath.hpp transform.hpp conversion.hpp)
+add_executable(Vision main.cpp cammath.hpp transform.hpp conversion.hpp pixyfinder.cpp pixyfinder.hpp connectionwaiter.cpp connectionwaiter.hpp)
 target_include_directories(Vision PUBLIC libs/pixy2/src/host/libpixyusb2/include libs/gcem/include libs/allwpilib/ntcore/src/main/native/include libs/eigen libs/spdlog/include)
 add_dependencies(Vision libusb)
-target_link_libraries(Vision pixy2usb opencv_core opencv_imgproc opencv_features2d opencv_calib3d carotene ntcore libusb-1.0${CMAKE_STATIC_LIBRARY_SUFFIX} )
+target_link_libraries(Vision pixy2usb opencv_core opencv_imgproc opencv_features2d opencv_calib3d ntcore libusb-1.0${CMAKE_STATIC_LIBRARY_SUFFIX} )
 if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
 target_link_libraries(Vision atomic -static-libstdc++ -static-libgcc)
+endif()
+if(MINGW)
+target_link_libraries(Vision ws2_32)
 endif()
 set_property(TARGET Vision PROPERTY CXX_STANDARD 17)
 set_property(TARGET Vision PROPERTY CXX_STANDARD_REQUIRED YES)
 target_include_directories(Vision PUBLIC libs/opencv/include ${opencv_module_include_dirs} ${CMAKE_BINARY_DIR})
 add_dependencies(Vision opencv_modules)
+set_target_properties(Vision PROPERTIES
+    COTIRE_PREFIX_HEADER_IGNORE_PATH "${CMAKE_SOURCE_DIR}"
+    COTIRE_PREFIX_HEADER_INCLUDE_PATH "${CMAKE_SOURCE_DIR}/libs")
 
-
-add_executable(VisionTest main.cpp cammath.hpp transform.hpp conversion.hpp)
+add_executable(VisionTest main.cpp cammath.hpp transform.hpp conversion.hpp pixyfinder.cpp pixyfinder.hpp connectionwaiter.cpp connectionwaiter.hpp)
 target_include_directories(VisionTest PUBLIC libs/pixy2/src/host/libpixyusb2/include libs/gcem/include libs/allwpilib/ntcore/src/main/native/include libs/eigen libs/spdlog/include)
 add_dependencies(VisionTest libusb)
-target_link_libraries(VisionTest pixy2usb opencv_core opencv_imgproc opencv_features2d opencv_calib3d carotene ntcore libusb-1.0${CMAKE_STATIC_LIBRARY_SUFFIX} )
+target_link_libraries(VisionTest pixy2usb opencv_core opencv_imgproc opencv_features2d opencv_calib3d ntcore libusb-1.0${CMAKE_STATIC_LIBRARY_SUFFIX} )
 if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
 target_link_libraries(VisionTest atomic -static-libstdc++ -static-libgcc)
+endif()
+if(MINGW)
+target_link_libraries(VisionTest ws2_32)
 endif()
 set_property(TARGET VisionTest PROPERTY CXX_STANDARD 17)
 set_property(TARGET VisionTest PROPERTY CXX_STANDARD_REQUIRED YES)
 target_compile_definitions(VisionTest PUBLIC DEV_TEST)
 target_include_directories(VisionTest PUBLIC libs/opencv/include ${opencv_module_include_dirs} ${CMAKE_BINARY_DIR})
 add_dependencies(VisionTest opencv_modules)
+
+set_target_properties(VisionTest PROPERTIES
+    COTIRE_PREFIX_HEADER_IGNORE_PATH "${CMAKE_SOURCE_DIR}"
+    COTIRE_PREFIX_HEADER_INCLUDE_PATH "${CMAKE_SOURCE_DIR}/libs")
+
+cotire(Vision VisionTest)
 
 add_executable(PixyRec pixyrec.cpp)
 target_include_directories(PixyRec PUBLIC libs/pixy2/src/host/libpixyusb2/include)

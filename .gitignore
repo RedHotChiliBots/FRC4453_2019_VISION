@@ -46,3 +46,5 @@ build
 .vscode/c_cpp_properties.json
 
 log
+
+.vscode/ipch
