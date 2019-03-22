@@ -2,6 +2,8 @@
 #define PIXYFINDER_HPP
 #include <mutex>
 #include <memory>
+#include <condition_variable>
+#include <unordered_map>
 
 #ifdef __GNUC__
 #pragma GCC diagnostic push
