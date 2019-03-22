@@ -30,6 +30,7 @@
 
 #include "connectionwaiter.hpp"
 #include "pixyfinder.hpp"
+#include "visionproc.hpp"
 
 #ifdef _WIN32
 #define LOG_FILE "./log/Vision.txt"
@@ -64,9 +65,6 @@ constexpr double CAM_FY_PIXEL = (CAM_RES_Y/2.0) / gcem::tan(CAM_FOV_Y / 2.0);
 
 constexpr double CAM_CENTERX = CAM_RES_X / 2.0;
 constexpr double CAM_CENTERY = CAM_RES_Y / 2.0;
-
-constexpr double LOCK_MAX_DY = 25;
-constexpr double LOCK_MIN_AREA = 20;
 
 cv::Mat getCamMat() {
     // Fx,  0, Cx
@@ -207,20 +205,11 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
 
         cv::Mat frame, frame_hsv;
         cv::cvtColor(m_bayer, frame, cv::ColorConversionCodes::COLOR_BayerRG2RGB, -1);
-        cv::cvtColor(frame, frame_hsv, cv::ColorConversionCodes::COLOR_RGB2HSV, -1);
+        cv::rotate(frame, frame, cv::ROTATE_90_CLOCKWISE);
 
-        cv::Mat green(frame_hsv.rows, frame_hsv.cols, CV_8U);
-        cv::inRange(frame_hsv, cv::Scalar(70, 0, 0), cv::Scalar(90, 255, 255), green);
+        auto contours = getContours(frame);
 
-        cv::rotate(green, green, cv::ROTATE_90_CLOCKWISE);
-
-        std::vector<std::vector<cv::Point> > contours;
-        cv::findContours(green, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_TC89_KCOS, cv::Point(0, 0));
-
-        std::vector<cv::RotatedRect> rectangles;
-        for(const auto c : contours) {
-            rectangles.push_back(cv::minAreaRect(c));
-        }
+        auto rectangles = getRects(contours);
         
         table->PutNumber("NumObjects", rectangles.size());
 
@@ -231,22 +220,11 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
             continue;
         }
 
-        std::sort(rectangles.begin(), rectangles.end(), [](const auto& a, const auto& b) {return a.size.area() > b.size.area();});
-
-        rectangles.resize(2);
-
         cv::RotatedRect left = rectangles[0];
         cv::RotatedRect right = rectangles[1];
 
-        if(left.size.area() < LOCK_MIN_AREA) {
-            pixy->setLED(255, 0, 255);
-            table->PutBoolean("Lock", false);
-            table->PutBoolean("Ok", true);
-            continue;
-        }
-        
-        if(right.size.area() < LOCK_MIN_AREA) {
-            pixy->setLED(255, 0, 255);
+        if(!areRectsGood(left, right)) {
+            pixy->setLED(0, 0, 255);
             table->PutBoolean("Lock", false);
             table->PutBoolean("Ok", true);
             continue;
@@ -254,15 +232,6 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
 
         if(left.center.x > right.center.x) {
             std::swap(left, right);
-        }
-
-        double d_y = right.center.y - left.center.y;
-
-        if(std::abs(d_y) > LOCK_MAX_DY) {
-            pixy->setLED(0, 0, 255);
-            table->PutBoolean("Lock", false);
-            table->PutBoolean("Ok", true);
-            continue;
         }
 
         cv::Mat camMat = getCamMat();
