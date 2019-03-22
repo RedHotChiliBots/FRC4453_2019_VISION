@@ -150,7 +150,7 @@ set_target_properties(VisionTest PROPERTIES
     COTIRE_PREFIX_HEADER_IGNORE_PATH "${CMAKE_SOURCE_DIR}"
     COTIRE_PREFIX_HEADER_INCLUDE_PATH "${CMAKE_SOURCE_DIR}/libs")
 
-cotire(Vision VisionTest)
+#cotire(Vision VisionTest)
 
 add_executable(PixyRec pixyrec.cpp)
 target_include_directories(PixyRec PUBLIC libs/pixy2/src/host/libpixyusb2/include)
