@@ -28,6 +28,15 @@
 // #include "transform.hpp"
 // #include "conversion.hpp"
 
+#include "connectionwaiter.hpp"
+#include "pixyfinder.hpp"
+
+#ifdef _WIN32
+#define LOG_FILE "./log/Vision.txt"
+#else
+#define LOG_FILE "/var/log/Vision.txt"
+#endif
+
 // Converts radians to degrees.
 constexpr double rad2deg(double v) {
     return v * (180.0 / M_PI);
@@ -171,150 +180,6 @@ std::vector<cv::Point2f> pointsFromRects(cv::RotatedRect left, cv::RotatedRect r
     return ret;
 }
 
-/**
- * Listens for NetworkTable connection events, and waits for a connection.
- */
-class ConnectionWaiter {
-public:
-    // The listener that is registered to NetworkTables.
-    struct Listener {
-        // The promise of a connection.
-        std::shared_ptr<std::promise<void>> p;
-        // Has the promise already been fufilled?
-        std::shared_ptr<bool> is_notified;
-
-        // Default constructor.
-        Listener() : p(new std::promise<void>()), is_notified(new bool(false)) {} 
-        // Copy constructor.
-        Listener(const Listener& l) : p(l.p), is_notified(l.is_notified) {}
-        // Move constructor.
-        Listener(Listener&& l) : p(std::move(l.p)), is_notified(std::move(l.is_notified)) {}
-
-        // Called by NetworkTables on a connection change event.
-        void operator()(const nt::ConnectionNotification& event) {
-            spdlog::debug("NT Listener: connected: {}", event.connected);
-            if(event.connected) { // Is this a connection?
-                if(!*is_notified) // If we haven't notified...
-                {
-                    p->set_value(); // Fufill the promise.
-                    *is_notified = true; // Don't do this again next time.
-                }
-            }
-        }
-    };
-
-    Listener listener; // The listener we will use.
-    std::future<void> connected; // Represents the time in the future when the connection happens.
-
-    // Default constructor; Inits future from promise.
-    ConnectionWaiter() : listener(), connected(listener.p->get_future()) {}
-
-    // Waits for a connection, with a timeout.
-    template<typename T>
-    void wait_for_connection(T timeout) {
-        if(!connected.valid()) { // Make sure our future is ok.
-            throw std::logic_error("Future is not valid!");
-        }
-        if(connected.wait_for(timeout) == std::future_status::timeout) { // Wait, and check for timeout.
-            throw std::runtime_error("Timeout while connecting to NetworkTables.");
-        }
-        return connected.get(); // Clear future.
-    }
-
-    void wait_for_connection() {
-        if(!connected.valid()) { // Make sure our future is ok.
-            throw std::logic_error("Future is not valid!");
-        }
-        return connected.get(); // Wait.
-    }
-};
-
-/**
- * Manages Pixys connected to the device.
- */
-class PixyFinder {
-    std::mutex m_update;
-    std::unique_lock<std::mutex> update_lock;
-    std::condition_variable do_update;
-    uint32_t id_to_update;
-
-    std::mutex m; // Mutex for the map.
-    std::condition_variable update_finished;
-    std::unordered_map<uint32_t, std::shared_ptr<Pixy2>> pixys; // The pixies we have.
-public:
-    PixyFinder(): update_lock(m_update) {}
-    
-    void do_updates() {
-        while(true) {
-            do_update.wait(update_lock);
-            spdlog::debug("Updating pixy {0:x}", id_to_update);
-            
-            if(pixys.count(id_to_update) > 0) {
-                if(pixys.at(id_to_update).use_count() != 1) {
-                    spdlog::critical("Pixy update requested, but it is in use!");
-                    std::terminate();
-                }
-                pixys.erase(id_to_update);
-            }
-
-            std::vector<std::shared_ptr<Pixy2> > jail;
-            
-            while(true) {
-                spdlog::trace("Getting a pixy...");
-                std::shared_ptr<Pixy2> pixy(new Pixy2());
-                int res = pixy->init();
-                if(res < 0) {
-                    spdlog::warn("Pixy {} not found!", id_to_update);
-                    break;
-                }
-
-                uint32_t uid = 0;
-                res = pixy->m_link.callChirp("getUID", END_OUT_ARGS, &uid, END_IN_ARGS); // Get UID.
-                if (res < 0) {
-                    spdlog::warn("Cannot get Pixy id, code {}", res);
-                    break;
-                }
-                if(uid == id_to_update)
-                {
-                    std::unique_lock lock2(m);
-                    pixys.insert(std::make_pair((uint32_t)uid, std::shared_ptr(pixy)));
-                    spdlog::debug("Found!");
-                    break;
-                }
-                spdlog::trace("Pixy doesn't match, was {}", uid);
-                jail.push_back(pixy);
-            }
-
-            std::unique_lock lock_m(m); // Wait a bit if we were too fast.
-            lock_m.unlock();
-            update_finished.notify_all();
-            std::this_thread::sleep_for(std::chrono::seconds(2));
-        }
-    }
-
-    // Tries to get a Pixy by id.
-    std::optional<std::shared_ptr<Pixy2>> get(uint32_t id) {
-        std::unique_lock lock(m); // Lock the mutex.
-        
-        while(pixys.count(id) == 0) { // If the pixy is missing...
-            return {}; // Return nothing.
-        }
-        return pixys.at(id);
-    }
-
-    void update(uint32_t id) {
-        {
-            std::unique_lock id_lock(m_update);
-            id_to_update = id;
-            id_lock.unlock();
-        }
-        std::unique_lock lock(m);
-        do_update.notify_one();
-        update_finished.wait(lock);
-        return;
-    }
-};
-
 // Processes vectors from a pixy and puts results in NetworkTables.
 void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> table, uint32_t id) {
     spdlog::debug("Camera thread started for id {0:x}", id);
@@ -452,7 +317,7 @@ int main() {
         auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
         //std::filesystem::create_directory("log");
 
-        auto file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>("/var/log/Vision.txt", 1048576 * 5, 3);
+        auto file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(LOG_FILE, 1048576 * 5, 3);
 
         auto logger = std::shared_ptr<spdlog::logger>(new spdlog::logger("Vision", {console_sink, file_sink}));
         logger->set_level(spdlog::level::trace);

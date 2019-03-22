@@ -22,3 +22,6 @@
 [submodule "libs/mingw-std-threads"]
 	path = libs/mingw-std-threads
 	url = https://github.com/meganz/mingw-std-threads.git
+[submodule "libs/cotire"]
+	path = libs/cotire
+	url = https://github.com/sakra/cotire.git
