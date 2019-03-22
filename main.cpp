@@ -56,6 +56,9 @@ constexpr double CAM_FY_PIXEL = (CAM_RES_Y/2.0) / gcem::tan(CAM_FOV_Y / 2.0);
 constexpr double CAM_CENTERX = CAM_RES_X / 2.0;
 constexpr double CAM_CENTERY = CAM_RES_Y / 2.0;
 
+constexpr double LOCK_MAX_DY = 25;
+constexpr double LOCK_MIN_AREA = 20;
+
 cv::Mat getCamMat() {
     // Fx,  0, Cx
     //  0, Fy, Cy
@@ -357,6 +360,7 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
         table->PutNumber("NumObjects", rectangles.size());
 
         if(rectangles.size() < 2) {
+            pixy->setLED(255, 0, 0);
             table->PutBoolean("Lock", false);
             table->PutBoolean("Ok", true);
             continue;
@@ -369,8 +373,32 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
         cv::RotatedRect left = rectangles[0];
         cv::RotatedRect right = rectangles[1];
 
+        if(left.area() < MIN_AREA) {
+            pixy->setLED(255, 0, 0);
+            table->PutBoolean("Lock", false);
+            table->PutBoolean("Ok", true);
+            continue;
+        }
+        
+        if(right.area() < MIN_AREA) {
+            pixy->setLED(255, 0, 0);
+            table->PutBoolean("Lock", false);
+            table->PutBoolean("Ok", true);
+            continue;
+        }
+
         if(left.center.x > right.center.x) {
             std::swap(left, right);
+        }
+
+        double d_y = right.center.y - left.center.y;
+
+        if(std::abs(d_y) > LOCK_MAX_DY) {
+            pixy->setLED(255, 0, 0);
+            table->PutBoolean("Lock", false);
+            table->PutBoolean("Ok", true);
+            continue;
+        
         }
 
         cv::Mat camMat = getCamMat();
@@ -412,6 +440,8 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
         table->PutNumber("Turn", rad2deg(turn));
         table->PutNumber("Strafe", rad2deg(strafe));
         table->PutNumber("ServoError", rad2deg(servoError));
+
+        pixy->setLED(0, 255, 0);
 
         table->PutBoolean("Lock", true);
         table->PutBoolean("Ok", true);
