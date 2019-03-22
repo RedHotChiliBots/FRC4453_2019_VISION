@@ -366,22 +366,22 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
             continue;
         }
 
-        std::sort(rectangles.begin(), rectangles.end(), [](const auto& a, const auto& b) {return a.size.area() < b.size.area();});
+        std::sort(rectangles.begin(), rectangles.end(), [](const auto& a, const auto& b) {return a.size.area() > b.size.area();});
 
         rectangles.resize(2);
 
         cv::RotatedRect left = rectangles[0];
         cv::RotatedRect right = rectangles[1];
 
-        if(left.area() < MIN_AREA) {
-            pixy->setLED(255, 0, 0);
+        if(left.size.area() < LOCK_MIN_AREA) {
+            pixy->setLED(255, 0, 255);
             table->PutBoolean("Lock", false);
             table->PutBoolean("Ok", true);
             continue;
         }
         
-        if(right.area() < MIN_AREA) {
-            pixy->setLED(255, 0, 0);
+        if(right.size.area() < LOCK_MIN_AREA) {
+            pixy->setLED(255, 0, 255);
             table->PutBoolean("Lock", false);
             table->PutBoolean("Ok", true);
             continue;
@@ -394,11 +394,10 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
         double d_y = right.center.y - left.center.y;
 
         if(std::abs(d_y) > LOCK_MAX_DY) {
-            pixy->setLED(255, 0, 0);
+            pixy->setLED(0, 0, 255);
             table->PutBoolean("Lock", false);
             table->PutBoolean("Ok", true);
             continue;
-        
         }
 
         cv::Mat camMat = getCamMat();
