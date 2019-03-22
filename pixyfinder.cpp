@@ -54,11 +54,11 @@ void PixyFinder::do_updates() {
     }
 }
 
-std::optional<std::shared_ptr<Pixy2>> PixyFinder::get(uint32_t id) {
+std::shared_ptr<Pixy2> PixyFinder::get(uint32_t id) {
     std::unique_lock lock(m); // Lock the mutex.
     
     while(pixys.count(id) == 0) { // If the pixy is missing...
-        return {}; // Return nothing.
+        throw std::runtime_error("Missing pixy!"); // Return nothing.
     }
     return pixys.at(id);
 }

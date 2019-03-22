@@ -5,7 +5,6 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/rotating_file_sink.h>
-#include <optional>
 
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
@@ -185,17 +184,15 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
     while(true) { // Do this forever.
         std::shared_ptr<Pixy2> pixy;
         
-        {
-            auto pixy_try = p->get(id); // Try to get pixy.
-            if(!pixy_try.has_value()) { // Failed?
-                table->PutBoolean("Lock", false);
-                table->PutBoolean("Ok", false);
-                table->GetInstance().Flush();
-                p->update(id);
-                continue; // Skip loop.
-            }
-            pixy = pixy_try.value(); // Retrieve pixy.
-        } // pixy_try is deleted here.
+        try {
+            pixy = p->get(id); // Retrieve pixy.
+        } catch (...) {
+            table->PutBoolean("Lock", false);
+            table->PutBoolean("Ok", false);
+            table->GetInstance().Flush();
+            p->update(id);
+            continue; // Skip loop.
+        }
 
         pixy->m_link.stop();
 

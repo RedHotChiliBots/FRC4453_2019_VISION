@@ -1,7 +1,6 @@
 #ifndef PIXYFINDER_HPP
 #define PIXYFINDER_HPP
 #include <mutex>
-#include <optional>
 #include <memory>
 
 #ifdef __GNUC__
@@ -31,7 +30,7 @@ public:
     void do_updates();
 
     // Tries to get a Pixy by id.
-    std::optional<std::shared_ptr<Pixy2>> get(uint32_t id);
+    std::shared_ptr<Pixy2> get(uint32_t id);
 
     void update(uint32_t id);
 };
