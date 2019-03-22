@@ -38,7 +38,7 @@ void PixyFinder::do_updates() {
             }
             if(uid == id_to_update)
             {
-                std::unique_lock lock2(m);
+                std::unique_lock<std::mutex> lock2(m);
                 pixys.insert(std::make_pair((uint32_t)uid, std::shared_ptr(pixy)));
                 spdlog::debug("Found!");
                 break;
@@ -47,7 +47,7 @@ void PixyFinder::do_updates() {
             jail.push_back(pixy);
         }
 
-        std::unique_lock lock_m(m); // Wait a bit if we were too fast.
+        std::unique_lock<std::mutex> lock_m(m); // Wait a bit if we were too fast.
         lock_m.unlock();
         update_finished.notify_all();
         std::this_thread::sleep_for(std::chrono::seconds(2));
@@ -55,7 +55,7 @@ void PixyFinder::do_updates() {
 }
 
 std::shared_ptr<Pixy2> PixyFinder::get(uint32_t id) {
-    std::unique_lock lock(m); // Lock the mutex.
+    std::unique_lock<std::mutex> lock(m); // Lock the mutex.
     
     while(pixys.count(id) == 0) { // If the pixy is missing...
         throw std::runtime_error("Missing pixy!"); // Return nothing.
@@ -65,11 +65,11 @@ std::shared_ptr<Pixy2> PixyFinder::get(uint32_t id) {
 
 void PixyFinder::update(uint32_t id) {
     {
-        std::unique_lock id_lock(m_update);
+        std::unique_lock<std::mutex> id_lock(m_update);
         id_to_update = id;
         id_lock.unlock();
     }
-    std::unique_lock lock(m);
+    std::unique_lock<std::mutex> lock(m);
     do_update.notify_one();
     update_finished.wait(lock);
     return;
