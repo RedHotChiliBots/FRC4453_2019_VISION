@@ -39,7 +39,7 @@ void PixyFinder::do_updates() {
             if(uid == id_to_update)
             {
                 std::unique_lock<std::mutex> lock2(m);
-                pixys.insert(std::make_pair((uint32_t)uid, std::shared_ptr(pixy)));
+                pixys.insert(std::make_pair((uint32_t)uid, std::shared_ptr<Pixy2>(pixy)));
                 spdlog::debug("Found!");
                 break;
             }
