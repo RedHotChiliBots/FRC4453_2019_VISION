@@ -32,7 +32,7 @@
 #include "pixyfinder.hpp"
 #include "visionproc.hpp"
 
-#ifdef _WIN32
+#if (defined(_WIN32) | defined(DEV_TEST))
 #define LOG_FILE "./log/Vision.txt"
 #else
 #define LOG_FILE "/var/log/Vision.txt"

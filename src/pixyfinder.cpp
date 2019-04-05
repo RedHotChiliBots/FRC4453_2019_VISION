@@ -26,7 +26,7 @@ void PixyFinder::do_updates() {
             std::shared_ptr<Pixy2> pixy(new Pixy2());
             int res = pixy->init();
             if(res < 0) {
-                spdlog::warn("Pixy {} not found!", id_to_update);
+                spdlog::warn("Pixy {0:x} not found!", id_to_update);
                 break;
             }
 
@@ -43,7 +43,7 @@ void PixyFinder::do_updates() {
                 spdlog::debug("Found!");
                 break;
             }
-            spdlog::trace("Pixy doesn't match, was {}", uid);
+            spdlog::trace("Pixy doesn't match, was {0:x}", uid);
             jail.push_back(pixy);
         }
 
