@@ -93,6 +93,31 @@ ExternalProject_Get_Property(libusb install_dir)
 link_directories(${install_dir}/lib)
 include_directories(${install_dir}/include/libusb-1.0)
 endif()
+elseif(${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
+ExternalProject_Add(
+  libusb
+  GIT_REPOSITORY https://github.com/libusb/libusb.git
+  UPDATE_COMMAND ""
+  CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR> --disable-shared --disable-udev "CFLAGS=${LIBUSB_CFLAGS}" "CXXFLAGS=${LIBUSB_CXXFLAGS}" "CC=${CMAKE_C_COMPILER}" "CXX=${CMAKE_CXX_COMPILER}"
+  BUILD_COMMAND make "CFLAGS=${LIBUSB_CFLAGS}" "CXXFLAGS=${LIBUSB_CXXFLAGS}"  "CC=${CMAKE_C_COMPILER}" "CXX=${CMAKE_CXX_COMPILER"
+  BUILD_BYPRODUCTS <INSTALL_DIR>/lib/libusb-1.0.a
+)
+
+ExternalProject_Add_Step(
+  libusb
+  bootstrap
+  COMMAND ./bootstrap.sh
+  WORKING_DIRECTORY <SOURCE_DIR>
+  DEPENDEES update
+  DEPENDERS configure
+  BYPRODUCTS <SOURCE_DIR>/configure
+  ALWAYS 0
+)
+
+ExternalProject_Get_Property(libusb install_dir)
+link_directories(${install_dir}/lib)
+include_directories(${install_dir}/include/libusb-1.0)
+
 else()
 ExternalProject_Add(
   libusb
@@ -115,8 +140,8 @@ add_dependencies(pixy2usb libusb)
 target_include_directories(pixy2usb PUBLIC libs/pixy2/src/common/inc libs/pixy2/src/host/libpixyusb2/include libs/pixy2/src/host/arduino/libraries/Pixy2)
 
 # Main binary
-add_executable(Vision main.cpp cammath.hpp transform.hpp conversion.hpp pixyfinder.cpp pixyfinder.hpp connectionwaiter.cpp connectionwaiter.hpp visionproc.cpp visionproc.hpp)
-target_include_directories(Vision PUBLIC libs/pixy2/src/host/libpixyusb2/include libs/gcem/include libs/allwpilib/ntcore/src/main/native/include libs/eigen libs/spdlog/include)
+add_executable(Vision src/main.cpp include/cammath.hpp include/transform.hpp include/conversion.hpp src/pixyfinder.cpp include/pixyfinder.hpp src/connectionwaiter.cpp include/connectionwaiter.hpp src/visionproc.cpp include/visionproc.hpp)
+target_include_directories(Vision PUBLIC include libs/pixy2/src/host/libpixyusb2/include libs/gcem/include libs/allwpilib/ntcore/src/main/native/include libs/eigen libs/spdlog/include)
 add_dependencies(Vision libusb)
 target_link_libraries(Vision pixy2usb opencv_core opencv_imgproc opencv_features2d opencv_calib3d ntcore libusb-1.0${CMAKE_STATIC_LIBRARY_SUFFIX} )
 if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
@@ -133,8 +158,8 @@ set_target_properties(Vision PROPERTIES
     COTIRE_PREFIX_HEADER_IGNORE_PATH "${CMAKE_SOURCE_DIR}"
     COTIRE_PREFIX_HEADER_INCLUDE_PATH "${CMAKE_SOURCE_DIR}/libs")
 
-add_executable(VisionTest main.cpp cammath.hpp transform.hpp conversion.hpp pixyfinder.cpp pixyfinder.hpp connectionwaiter.cpp connectionwaiter.hpp visionproc.cpp visionproc.hpp)
-target_include_directories(VisionTest PUBLIC libs/pixy2/src/host/libpixyusb2/include libs/gcem/include libs/allwpilib/ntcore/src/main/native/include libs/eigen libs/spdlog/include)
+add_executable(VisionTest src/main.cpp include/cammath.hpp include/transform.hpp include/conversion.hpp src/pixyfinder.cpp include/pixyfinder.hpp src/connectionwaiter.cpp include/connectionwaiter.hpp src/visionproc.cpp include/visionproc.hpp)
+target_include_directories(VisionTest PUBLIC include libs/pixy2/src/host/libpixyusb2/include libs/gcem/include libs/allwpilib/ntcore/src/main/native/include libs/eigen libs/spdlog/include)
 add_dependencies(VisionTest libusb)
 target_link_libraries(VisionTest pixy2usb opencv_core opencv_imgproc opencv_features2d opencv_calib3d ntcore libusb-1.0${CMAKE_STATIC_LIBRARY_SUFFIX} )
 if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
@@ -155,7 +180,7 @@ set_target_properties(VisionTest PROPERTIES
 
 #cotire(Vision VisionTest)
 
-add_executable(PixyRec pixyrec.cpp)
+add_executable(PixyRec src/pixyrec.cpp)
 target_include_directories(PixyRec PUBLIC libs/pixy2/src/host/libpixyusb2/include)
 add_dependencies(PixyRec libusb)
 target_link_libraries(PixyRec pixy2usb opencv_core opencv_imgproc opencv_videoio libusb-1.0${CMAKE_STATIC_LIBRARY_SUFFIX} )
@@ -175,20 +200,20 @@ add_dependencies(PixyRec opencv_modules)
 # endif()
 
 #Tests
-add_executable(CammathTest test/test.cpp test/test.hpp test/cammath.cpp cammath.hpp)
-target_include_directories(CammathTest PUBLIC ./ libs/gcem/include test libs/eigen)
+add_executable(CammathTest test/test.cpp test/test.hpp test/cammath.cpp include/cammath.hpp)
+target_include_directories(CammathTest PUBLIC include libs/gcem/include test libs/eigen)
 set_property(TARGET CammathTest PROPERTY CXX_STANDARD 17)
 set_property(TARGET CammathTest PROPERTY CXX_STANDARD_REQUIRED YES)
 add_test(cammath CammathTest)
 
-add_executable(TransformTest test/test.cpp test/test.hpp test/transform.cpp transform.hpp cammath.hpp)
-target_include_directories(TransformTest PUBLIC ./ libs/gcem/include test libs/eigen)
+add_executable(TransformTest test/test.cpp test/test.hpp test/transform.cpp include/transform.hpp include/cammath.hpp)
+target_include_directories(TransformTest PUBLIC include libs/gcem/include test libs/eigen)
 set_property(TARGET TransformTest PROPERTY CXX_STANDARD 17)
 set_property(TARGET TransformTest PROPERTY CXX_STANDARD_REQUIRED YES)
 add_test(transform TransformTest)
 
-add_executable(VisionprocTest test/test.cpp test/test.hpp test/visionproc.cpp visionproc.hpp visionproc.cpp )
-target_include_directories(VisionprocTest PUBLIC ./ libs/gcem/include test libs/eigen )
+add_executable(VisionprocTest test/test.cpp test/test.hpp test/visionproc.cpp include/visionproc.hpp src/visionproc.cpp )
+target_include_directories(VisionprocTest PUBLIC include libs/gcem/include test libs/eigen )
 target_link_libraries(VisionprocTest opencv_core opencv_imgproc opencv_features2d opencv_calib3d)
 set_property(TARGET VisionprocTest PROPERTY CXX_STANDARD 17)
 set_property(TARGET VisionprocTest PROPERTY CXX_STANDARD_REQUIRED YES)
@@ -202,7 +227,7 @@ install(TARGETS Vision
   DESTINATION bin
   COMPONENT Vision)
 
-install(FILES ${CMAKE_SOURCE_DIR}/vision.service 
+install(FILES ${CMAKE_SOURCE_DIR}/misc/vision.service 
   DESTINATION ${SYSTEMD_UNIT_DIR}
   COMPONENT Vision)
 
