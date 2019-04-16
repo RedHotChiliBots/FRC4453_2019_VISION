@@ -9,6 +9,9 @@
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/calib3d.hpp>
+#ifdef DEV_TEST
+#include <opencv2/highgui.hpp>
+#endif
 
 #ifdef __GNUC__
 #pragma GCC diagnostic push
@@ -196,6 +199,12 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
 
         pixy->m_link.stop();
 
+        int _res;
+
+        pixy->m_link.callChirp("cam_setAEC", INT8(1), END_OUT_ARGS, &_res, END_IN_ARGS);
+        //pixy->m_link.callChirp("cam_setAWB", INT8(1), END_OUT_ARGS, &_res, END_IN_ARGS);
+
+
         uint8_t* bayer = nullptr;
         pixy->m_link.getRawFrame(&bayer);
 
@@ -210,6 +219,26 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
         auto rectangles = getRects(contours);
         
         table->PutNumber("NumObjects", rectangles.size());
+
+        
+        #ifdef DEV_TEST
+        cv::Mat display_frame = frame.clone();
+
+        cv::drawContours(display_frame, contours, -1, cv::Scalar(0, 0, 255));
+
+
+        for(size_t i = 0; i < rectangles.size(); i++) {
+            auto bb = rectangles[i].boundingRect();
+            cv::rectangle(display_frame, bb, cv::Scalar(255, 0, 0));
+            cv::putText(display_frame, std::to_string(i), bb.tl(), cv::FONT_HERSHEY_PLAIN, 1.0, cv::Scalar(255, 0, 0));
+        }
+
+        cv::cvtColor(display_frame, display_frame, cv::ColorConversionCodes::COLOR_RGB2BGR, -1);
+
+        cv::imshow("Frame", display_frame);
+        cv::waitKey(1);
+        #endif
+
 
         if(rectangles.size() < 2) {
             pixy->setLED(255, 0, 0);
