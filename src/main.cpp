@@ -223,9 +223,7 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
         
         #ifdef DEV_TEST
         cv::Mat display_frame = frame.clone();
-
         cv::drawContours(display_frame, contours, -1, cv::Scalar(0, 0, 255));
-
 
         for(size_t i = 0; i < rectangles.size(); i++) {
             auto bb = rectangles[i].boundingRect();
@@ -233,17 +231,20 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
             cv::putText(display_frame, std::to_string(i), bb.tl(), cv::FONT_HERSHEY_PLAIN, 1.0, cv::Scalar(255, 0, 0));
         }
 
-        cv::cvtColor(display_frame, display_frame, cv::ColorConversionCodes::COLOR_RGB2BGR, -1);
-
-        cv::imshow("Frame", display_frame);
-        cv::waitKey(1);
         #endif
+
 
 
         if(rectangles.size() < 2) {
             pixy->setLED(255, 0, 0);
             table->PutBoolean("Lock", false);
             table->PutBoolean("Ok", true);
+            #ifdef DEV_TEST
+            cv::cvtColor(display_frame, display_frame, cv::ColorConversionCodes::COLOR_RGB2BGR, -1);
+            cv::imshow("Frame", display_frame);
+            cv::waitKey(1);
+            #endif
+            
             continue;
         }
 
@@ -254,6 +255,14 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
             pixy->setLED(0, 0, 255);
             table->PutBoolean("Lock", false);
             table->PutBoolean("Ok", true);
+
+            #ifdef DEV_TEST
+            cv::cvtColor(display_frame, display_frame, cv::ColorConversionCodes::COLOR_RGB2BGR, -1);
+            cv::imshow("Frame", display_frame);
+            cv::waitKey(1);
+            #endif
+            
+
             continue;
         }
 
@@ -269,8 +278,21 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
         cv::Mat r_vec(1, 3, CV_64F);
         cv::Mat T_cv(1, 3, CV_64F);
 
-        cv::solvePnP(object_pts, image_pts, camMat, std::vector<double>(), r_vec, T_cv, cv::SOLVEPNP_EPNP);
+        cv::solvePnPRansac(object_pts, image_pts, camMat, std::vector<double>(), r_vec, T_cv, cv::SOLVEPNP_EPNP);
         
+
+        #ifdef DEV_TEST
+        std::vector<cv::Point2f> draw_imgpts; 
+
+        cv::projectPoints(std::vector({cv::Point3f(0, 0, 0), cv::Point3f(0, 0, 1)}), r_vec, T_cv, camMat, std::vector<double>(), draw_imgpts);
+
+        cv::line(display_frame, draw_imgpts[0], draw_imgpts[1], cv::Scalar(0, 255, 0));
+
+        cv::cvtColor(display_frame, display_frame, cv::ColorConversionCodes::COLOR_RGB2BGR, -1);
+        cv::imshow("Frame", display_frame);
+        cv::waitKey(1);
+        #endif
+
         cv::Mat r_mat;
         cv::Rodrigues(r_vec, r_mat);
 
