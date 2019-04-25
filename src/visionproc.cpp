@@ -55,9 +55,9 @@ bool areRectsGood(const cv::RotatedRect& left, const cv::RotatedRect& right) {
 
         double d_y = right.center.y - left.center.y;
 
-        if(std::abs(d_y) > LOCK_MAX_DY) {
-            return false;
-        }
+        // if(std::abs(d_y) > LOCK_MAX_DY) {
+        //     return false;
+        // }
 
         return true;
 }

@@ -83,7 +83,7 @@ constexpr uint32_t PIXY_REAR_ID = 0xF1435B59; // UID of rear camera.
 // Calculation of strip corner coordinates
 
 // Basic info from game manual.
-constexpr double STRIP_ANGLE_ABS = 14.5 / 2;
+constexpr double STRIP_ANGLE_ABS = deg2rad(14.5);
 constexpr double STRIP_ANGLE_TOL = 1.5;
 constexpr double STRIP_HEIGHT = 5.5;
 constexpr double STRIP_WIDTH = 2;
@@ -140,25 +140,25 @@ constexpr double LSTRIP_BOTRIGHT_X = LSTRIP_BOTRIGHT_X_LOCAL - (STRIP_OFFSET + L
 constexpr double LSTRIP_BOTRIGHT_Y = LSTRIP_BOTRIGHT_Y_LOCAL;
 
 // Right strip coordinates.
-constexpr double RSTRIP_TOPLEFT_X  = RSTRIP_TOPLEFT_X_LOCAL  + (STRIP_OFFSET + RSTRIP_TOPLEFT_X_LOCAL);
+constexpr double RSTRIP_TOPLEFT_X  = RSTRIP_TOPLEFT_X_LOCAL  + (STRIP_OFFSET - RSTRIP_TOPLEFT_X_LOCAL);
 constexpr double RSTRIP_TOPLEFT_Y  = RSTRIP_TOPLEFT_Y_LOCAL;
-constexpr double RSTRIP_TOPRIGHT_X = RSTRIP_TOPRIGHT_X_LOCAL + (STRIP_OFFSET + RSTRIP_TOPLEFT_X_LOCAL);
+constexpr double RSTRIP_TOPRIGHT_X = RSTRIP_TOPRIGHT_X_LOCAL + (STRIP_OFFSET - RSTRIP_TOPLEFT_X_LOCAL);
 constexpr double RSTRIP_TOPRIGHT_Y = RSTRIP_TOPRIGHT_Y_LOCAL;
-constexpr double RSTRIP_BOTLEFT_X  = RSTRIP_BOTLEFT_X_LOCAL  + (STRIP_OFFSET + RSTRIP_TOPLEFT_X_LOCAL);
+constexpr double RSTRIP_BOTLEFT_X  = RSTRIP_BOTLEFT_X_LOCAL  + (STRIP_OFFSET - RSTRIP_TOPLEFT_X_LOCAL);
 constexpr double RSTRIP_BOTLEFT_Y  = RSTRIP_BOTLEFT_Y_LOCAL;
-constexpr double RSTRIP_BOTRIGHT_X = RSTRIP_BOTRIGHT_X_LOCAL + (STRIP_OFFSET + RSTRIP_TOPLEFT_X_LOCAL);
+constexpr double RSTRIP_BOTRIGHT_X = RSTRIP_BOTRIGHT_X_LOCAL + (STRIP_OFFSET - RSTRIP_TOPLEFT_X_LOCAL);
 constexpr double RSTRIP_BOTRIGHT_Y = RSTRIP_BOTRIGHT_Y_LOCAL;
 
-std::vector<cv::Point3d> getStrips() {
-    std::vector<cv::Point3d> ret;
-    ret.push_back(cv::Point3d(LSTRIP_TOPLEFT_X,  LSTRIP_TOPLEFT_Y,  0));
-    ret.push_back(cv::Point3d(LSTRIP_TOPRIGHT_X, LSTRIP_TOPRIGHT_Y, 0));
-    ret.push_back(cv::Point3d(LSTRIP_BOTLEFT_X,  LSTRIP_BOTLEFT_Y,  0));
-    ret.push_back(cv::Point3d(LSTRIP_BOTRIGHT_X, LSTRIP_BOTRIGHT_Y, 0));
-    ret.push_back(cv::Point3d(RSTRIP_TOPLEFT_X,  RSTRIP_TOPLEFT_Y,  0));
-    ret.push_back(cv::Point3d(RSTRIP_TOPRIGHT_X, RSTRIP_TOPRIGHT_Y, 0));
-    ret.push_back(cv::Point3d(RSTRIP_BOTLEFT_X,  RSTRIP_BOTLEFT_Y,  0));
-    ret.push_back(cv::Point3d(RSTRIP_BOTRIGHT_X, RSTRIP_BOTRIGHT_Y, 0));
+std::vector<cv::Point3f> getStrips() {
+    std::vector<cv::Point3f> ret;
+    ret.push_back(cv::Point3f(LSTRIP_TOPLEFT_X,  LSTRIP_TOPLEFT_Y,  0));
+    ret.push_back(cv::Point3f(LSTRIP_TOPRIGHT_X, LSTRIP_TOPRIGHT_Y, 0));
+    ret.push_back(cv::Point3f(LSTRIP_BOTLEFT_X,  LSTRIP_BOTLEFT_Y,  0));
+    ret.push_back(cv::Point3f(LSTRIP_BOTRIGHT_X, LSTRIP_BOTRIGHT_Y, 0));
+    ret.push_back(cv::Point3f(RSTRIP_TOPLEFT_X,  RSTRIP_TOPLEFT_Y,  0));
+    ret.push_back(cv::Point3f(RSTRIP_TOPRIGHT_X, RSTRIP_TOPRIGHT_Y, 0));
+    ret.push_back(cv::Point3f(RSTRIP_BOTLEFT_X,  RSTRIP_BOTLEFT_Y,  0));
+    ret.push_back(cv::Point3f(RSTRIP_BOTRIGHT_X, RSTRIP_BOTRIGHT_Y, 0));
     return ret;
 }
 
@@ -207,6 +207,13 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
 
         uint8_t* bayer = nullptr;
         pixy->m_link.getRawFrame(&bayer);
+
+        if(bayer == nullptr) {
+            pixy->setLED(255, 0, 0);
+            table->PutBoolean("Lock", false);
+            table->PutBoolean("Ok", false);
+            continue;
+        }
 
         cv::Mat m_bayer(PIXY2_RAW_FRAME_HEIGHT, PIXY2_RAW_FRAME_WIDTH, CV_8U, bayer);
 
@@ -278,15 +285,30 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
         cv::Mat r_vec(1, 3, CV_64F);
         cv::Mat T_cv(1, 3, CV_64F);
 
-        cv::solvePnPRansac(object_pts, image_pts, camMat, std::vector<double>(), r_vec, T_cv, cv::SOLVEPNP_EPNP);
+        auto res = cv::solvePnPRansac(object_pts, image_pts, camMat, std::vector<double>(), r_vec, T_cv, false, 100, 8.0f, 0.95);
         
+        if(!res) {
+            pixy->setLED(0, 0, 255);
+            table->PutBoolean("Lock", false);
+            table->PutBoolean("Ok", true);
+
+            #ifdef DEV_TEST
+            cv::cvtColor(display_frame, display_frame, cv::ColorConversionCodes::COLOR_RGB2BGR, -1);
+            cv::imshow("Frame", display_frame);
+            cv::waitKey(1);
+            #endif
+
+            continue;
+        }
 
         #ifdef DEV_TEST
         std::vector<cv::Point2f> draw_imgpts; 
+        auto draw_objpts = getStrips();
+        cv::projectPoints(draw_objpts, r_vec, T_cv, camMat, std::vector<double>(), draw_imgpts);
 
-        cv::projectPoints(std::vector({cv::Point3f(0, 0, 0), cv::Point3f(0, 0, 1)}), r_vec, T_cv, camMat, std::vector<double>(), draw_imgpts);
-
-        cv::line(display_frame, draw_imgpts[0], draw_imgpts[1], cv::Scalar(0, 255, 0));
+        for(const auto& p : draw_imgpts) {
+            cv::circle(display_frame, p, 3, cv::Scalar(0, 255, 0));
+        }
 
         cv::cvtColor(display_frame, display_frame, cv::ColorConversionCodes::COLOR_RGB2BGR, -1);
         cv::imshow("Frame", display_frame);
@@ -343,6 +365,11 @@ int main() {
     }
 
     spdlog::info("Vision Starting...");
+
+    spdlog::debug("Target Points: ");
+    for(auto p : getStrips()) {
+        spdlog::debug("({}, {})", p.x, p.y, p.z);
+    }
 
     // In another thread, setup NetworkTables.
     auto networktables_f = std::async([]() {
