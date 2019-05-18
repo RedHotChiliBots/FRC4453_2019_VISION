@@ -162,22 +162,100 @@ std::vector<cv::Point3f> getStrips() {
     return ret;
 }
 
-std::vector<cv::Point2f> pointsFromRects(cv::RotatedRect left, cv::RotatedRect right) {
+cv::Point2f lineLineIntersection(const cv::Point2f& A, const cv::Point2f& B, const cv::Point2f& C, const cv::Point2f& D) 
+{ 
+    // Line AB represented as a1x + b1y = c1 
+    float a1 = B.y - A.y; 
+    float b1 = A.x - B.x; 
+    float c1 = a1*(A.x) + b1*(A.y); 
+  
+    // Line CD represented as a2x + b2y = c2 
+    float a2 = D.y - C.y; 
+    float b2 = C.x - D.x; 
+    float c2 = a2*(C.x)+ b2*(C.x); 
+    float determinant = a1*b2 - a2*b1; 
+  
+    if (determinant == 0) 
+    { 
+        // The lines are parallel. This is simplified 
+        // by returning a pair of FLT_MAX 
+        return cv::Point2f(FLT_MAX, FLT_MAX); 
+    } 
+    else
+    { 
+        float x = (b2*c1 - b1*c2)/determinant; 
+        float y = (a1*c2 - a2*c1)/determinant; 
+        return cv::Point2f(x, y); 
+    } 
+} 
+
+std::vector<cv::Point2f> pointsFromRects(const cv::RotatedRect& left, const cv::RotatedRect& right
+    #ifdef DEV_TEST
+    , const cv::Mat& frame 
+    #endif
+) {
     std::vector<cv::Point2f> ret;
 
-    cv::Point2f rect_pts[4];
-
-    left.points(rect_pts);
-    ret.push_back(rect_pts[1]);
-    ret.push_back(rect_pts[2]);
-    ret.push_back(rect_pts[0]);
-    ret.push_back(rect_pts[3]);
+    cv::Point2f left_rect_pts[4];
+    left.points(left_rect_pts);
     
-    right.points(rect_pts);
-    ret.push_back(rect_pts[1]);
-    ret.push_back(rect_pts[2]);
-    ret.push_back(rect_pts[0]);
-    ret.push_back(rect_pts[3]);
+    cv::Point2f right_rect_pts[4];
+    right.points(right_rect_pts);
+
+    const auto center = (left.center + right.center) / 2.0;
+
+    const auto vert_int = lineLineIntersection(left_rect_pts[0], left_rect_pts[1], right_rect_pts[0], right_rect_pts[1]);
+    const auto horz_int = lineLineIntersection(left_rect_pts[1], left_rect_pts[2], right_rect_pts[1], right_rect_pts[2]);
+
+    const auto vert_dist = cv::norm(vert_int - center);
+    const auto horz_dist = cv::norm(horz_int - center);
+
+    #ifdef DEV_TEST
+    cv::Mat draw_frame(frame.clone());
+    cv::line(draw_frame, center, vert_int, cv::Scalar(255, 255, 0));
+    cv::line(draw_frame, center, horz_int, cv::Scalar(255, 0, 255));
+
+    cv::line(draw_frame, left_rect_pts[0], left_rect_pts[1], cv::Scalar(0, 0, 255));
+    cv::line(draw_frame, left_rect_pts[1], left_rect_pts[2], cv::Scalar(0, 0, 255));
+    cv::line(draw_frame, left_rect_pts[2], left_rect_pts[3], cv::Scalar(0, 0, 255));
+
+    cv::line(draw_frame, right_rect_pts[0], right_rect_pts[1], cv::Scalar(255, 0, 0));
+    cv::line(draw_frame, right_rect_pts[1], right_rect_pts[2], cv::Scalar(255, 0, 0));
+    cv::line(draw_frame, right_rect_pts[2], right_rect_pts[3], cv::Scalar(255, 0, 0));
+    cv::cvtColor(draw_frame, draw_frame, cv::ColorConversionCodes::COLOR_RGB2BGR, -1);
+
+    cv::imshow("Rects", draw_frame);
+    cv::waitKey(1);
+    #endif
+
+    if(vert_dist > horz_dist) {
+        // Vertical
+        if((vert_int - center).y > 0) {
+            // Upright
+            ret.push_back( left_rect_pts[1]);
+            ret.push_back( left_rect_pts[2]);
+            ret.push_back( left_rect_pts[0]);
+            ret.push_back( left_rect_pts[3]);
+            ret.push_back(right_rect_pts[1]);
+            ret.push_back(right_rect_pts[2]);
+            ret.push_back(right_rect_pts[0]);
+            ret.push_back(right_rect_pts[3]);
+        } else {
+            // Upside-down
+            ret.push_back( left_rect_pts[3]);
+            ret.push_back( left_rect_pts[0]);
+            ret.push_back( left_rect_pts[2]);
+            ret.push_back( left_rect_pts[1]);
+            ret.push_back(right_rect_pts[3]);
+            ret.push_back(right_rect_pts[0]);
+            ret.push_back(right_rect_pts[2]);
+            ret.push_back(right_rect_pts[1]);
+        }
+    } else {
+        // TODO
+        spdlog::error("aaaaaaa {}, {}", vert_dist, horz_dist);
+    }
+
     return ret;
 }
 
@@ -220,6 +298,7 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
         cv::Mat frame, frame_hsv;
         cv::cvtColor(m_bayer, frame, cv::ColorConversionCodes::COLOR_BayerRG2RGB, -1);
         cv::rotate(frame, frame, cv::ROTATE_90_CLOCKWISE);
+
 
         auto contours = getContours(frame);
 
@@ -280,7 +359,15 @@ void thread_fn(std::shared_ptr<PixyFinder> p, std::shared_ptr<nt::NetworkTable> 
         cv::Mat camMat = getCamMat();
 
         auto object_pts = getStrips();
-        auto image_pts = pointsFromRects(left, right);
+        auto image_pts = pointsFromRects(left, right
+                                        #ifdef DEV_TEST
+                                            ,frame
+                                        #endif
+                                        );
+
+        if(image_pts.size() != 8) {
+            continue;
+        }
 
         cv::Mat r_vec(1, 3, CV_64F);
         cv::Mat T_cv(1, 3, CV_64F);

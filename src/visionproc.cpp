@@ -10,7 +10,7 @@ std::vector<std::vector<cv::Point> > getContours(const cv::Mat &frame) {
         cv::cvtColor(frame, frame_hsv, cv::ColorConversionCodes::COLOR_RGB2HSV, -1);
 
         cv::Mat green(frame_hsv.rows, frame_hsv.cols, CV_8U);
-        cv::inRange(frame_hsv, cv::Scalar(70, 100, 120), cv::Scalar(90, 255, 255), green);
+        cv::inRange(frame_hsv, cv::Scalar(70, 60, 100), cv::Scalar(90, 255, 255), green);
 
         std::vector<std::vector<cv::Point> > contours;
         cv::findContours(green, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_TC89_KCOS, cv::Point(0, 0));

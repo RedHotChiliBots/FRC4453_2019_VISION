@@ -28,12 +28,13 @@ if(MINGW)
   add_compile_definitions(_WIN32_WINNT=0x0A00)
 endif()
 
-# Options for wpilib.
+# Options for wpilib and opencv.
 set(WITHOUT_JAVA ON CACHE BOOL "don't include java and JNI in the build" FORCE)
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "build with shared libs (needed for JNI)" FORCE)
 set(WITHOUT_CSCORE ON CACHE BOOL "Don't build cscore (removes OpenCV requirement)" FORCE)
 set(WITHOUT_ALLWPILIB ON CACHE BOOL "Don't build allwpilib (removes OpenCV requirement)" FORCE)
 set(WITH_OPENCL OFF CACHE BOOL "" FORCE)
+#set(WITH_OPENNI ON CACHE BOOL "" FORCE)
 set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(BUILD_PERF_TESTS OFF CACHE BOOL "" FORCE)
 set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -157,6 +158,24 @@ add_dependencies(Vision opencv_modules)
 set_target_properties(Vision PROPERTIES
     COTIRE_PREFIX_HEADER_IGNORE_PATH "${CMAKE_SOURCE_DIR}"
     COTIRE_PREFIX_HEADER_INCLUDE_PATH "${CMAKE_SOURCE_DIR}/libs")
+
+# add_executable(VisionKinect src/main_kinect.cpp src/connectionwaiter.cpp include/connectionwaiter.hpp src/visionproc.cpp include/visionproc.hpp)
+# target_include_directories(VisionKinect PUBLIC include libs/gcem/include libs/allwpilib/ntcore/src/main/native/include libs/eigen libs/spdlog/include)
+# target_link_libraries(VisionKinect opencv_core opencv_imgproc opencv_features2d opencv_calib3d ntcore)
+
+# if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
+# target_link_libraries(VisionKinect atomic -static-libstdc++ -static-libgcc)
+# endif()
+# if(MINGW)
+# target_link_libraries(VisionKinect ws2_32)
+# endif()
+# set_property(TARGET VisionKinect PROPERTY CXX_STANDARD 17)
+# set_property(TARGET VisionKinect PROPERTY CXX_STANDARD_REQUIRED YES)
+# target_include_directories(VisionKinect PUBLIC libs/opencv/include ${opencv_module_include_dirs} ${CMAKE_BINARY_DIR})
+# add_dependencies(VisionKinect opencv_modules)
+# set_target_properties(VisionKinect PROPERTIES
+#     COTIRE_PREFIX_HEADER_IGNORE_PATH "${CMAKE_SOURCE_DIR}"
+#     COTIRE_PREFIX_HEADER_INCLUDE_PATH "${CMAKE_SOURCE_DIR}/libs")
 
 add_executable(VisionTest src/main.cpp include/cammath.hpp include/transform.hpp include/conversion.hpp src/pixyfinder.cpp include/pixyfinder.hpp src/connectionwaiter.cpp include/connectionwaiter.hpp src/visionproc.cpp include/visionproc.hpp)
 target_include_directories(VisionTest PUBLIC include libs/pixy2/src/host/libpixyusb2/include libs/gcem/include libs/allwpilib/ntcore/src/main/native/include libs/eigen libs/spdlog/include)
